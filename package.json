@@ -1,0 +1,24 @@
+{
+  "name": "jord",
+  "version": "0.1.0",
+  "description": "A GitHub Action that helps move workloads into greener time periods",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stebje/jord.git"
+  },
+  "keywords": [
+    "carbonhack22",
+    "green-software",
+    "github-actions"
+  ],
+  "author": "Steffen Bjerkenås <steffenbj@hotmail.com> (https://github.com/stebje)",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/stebje/jord/issues"
+  },
+  "homepage": "https://github.com/stebje/jord#readme"
+}
