@@ -1,0 +1,5 @@
+name: 'Jord'
+description: 'Do awesome, green stuff'
+runs:
+  using: 'node16'
+  main: 'dist/index.js'
