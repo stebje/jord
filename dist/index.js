@@ -1244,11 +1244,15 @@ async function run() {
 	const RUNNER_LOCATION = await _getRunnerLocation(IP_INFO.region)
 	core.info(`Matching Azure region: ${RUNNER_LOCATION}`)
 
-  // Get current emission level at runner location
-	// TODO
+	// Get current emission level at runner location
+	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(RUNNER_LOCATION)
+	core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING[0].rating}`)
 
 	// Get forecasted emission level at runner location
-  // TODO
+  // We don't want to print everything to console by default, to reduce noise. Rather print it to debug log.
+	const FORECASTED_EMISSION_RATINGS = await _getForecastedEmissionLevels(RUNNER_LOCATION)
+	core.info(`Successfully fetched forecasted emission ratings in region ${RUNNER_LOCATION}`)
+  core.debug(`Forecasted emission ratings in region ${RUNNER_LOCATION}: ${JSON.stringify(FORECASTED_EMISSION_RATINGS)}`)
 	
   // Determine whether to run the job or not
     // Things to tak into account:
@@ -1301,6 +1305,51 @@ async function _getRunnerLocation(location) {
 	return matchingRegions[0]
 }
 
+async function _getCurrentEmissionLevel(region) {
+	// TODO - Add API call to Carbon Aware SDK
+  
+  const PLACEHOLDER = JSON.parse(
+		'[{"location": "PJM_ROANOKE","time": "2022-11-02T10:20:00+00:00","rating": 545.67162111,"duration": "00:05:00"}]'
+	)
+
+  return PLACEHOLDER
+}
+
+async function _getForecastedEmissionLevels(region) {
+	// TODO - Add API call to Carbon Aware SDK
+  
+  const PLACEHOLDER = JSON.parse(`[{
+    "generatedAt": "2022-11-02T10:25:00+00:00",
+    "requestedAt": "2022-11-02T10:28:46.8644078+00:00",
+    "location": "eastus",
+    "dataStartAt": "2022-11-02T10:30:00+00:00",
+    "dataEndAt": "2022-11-03T10:30:00+00:00",
+    "windowSize": 5,
+    "optimalDataPoints": [
+      {
+        "location": "PJM_ROANOKE",
+        "timestamp": "2022-11-03T10:15:00+00:00",
+        "duration": 5,
+        "value": 544.8099506434546
+      }
+    ],
+    "forecastData": [
+      {
+        "location": "PJM_ROANOKE",
+        "timestamp": "2022-11-02T10:30:00+00:00",
+        "duration": 5,
+        "value": 547.3183851085558
+      },
+      {
+        "location": "PJM_ROANOKE",
+        "timestamp": "2022-11-02T10:35:00+00:00",
+        "duration": 5,
+        "value": 547.66173548531
+      }]
+    }]`)
+
+  return PLACEHOLDER
+}
 
 /***/ }),
 
