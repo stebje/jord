@@ -1282,43 +1282,6 @@ async function _getRunnerLocation(location) {
 	return matchingRegions[0]
 }
 
-async function _getPublicIP(os) {
-  // TODO: account for the different actions runners: macos, linux, windows
-  // Currently support only linux
-  const cmd = await _getPublicIPCmd(os)
-
-  // Execute applicable command for getting public IP of runner
-  exec(cmd, (error, stdout, stderr) => {
-    if (error) {
-      console.log(`error: ${error.message}`)
-      core.warning('Something went wrong when determining the public IP address, the workflow will continue.')
-      return
-    }
-
-    if (stderr) {
-      console.log(`stderr: ${stderr}`)
-      core.warning('Something went wrong when determining the public IP address, the workflow will continue.')
-      return
-    }
-
-    const publicIP = stdout
-    console.log(publicIP)
-    return publicIP
-  })
-}
-
-async function _getPublicIPCmd(os) {
-  let cmd
-  
-  switch (os) {
-    case 'linux':
-      cmd = 'dig +short myip.opendns.com @resolver1.opendns.com'
-      break
-  }
-
-  return cmd
-}
-
 
 /***/ }),
 
