@@ -25,7 +25,8 @@ async function run() {
 	core.info(CURRENT_EMISSION_RATING[0].rating)
 
 	// Get forecasted emission level at runner location
-  // TODO
+	const FORECASTED_EMISSION_RATING = await _getForecastedEmissionLevels(RUNNER_LOCATION)
+	core.info(FORECASTED_EMISSION_RATING[0].optimalDataPoints[0].value)
 	
   // Determine whether to run the job or not
     // Things to tak into account:
@@ -84,6 +85,42 @@ async function _getCurrentEmissionLevel(region) {
   const PLACEHOLDER = JSON.parse(
 		'[{"location": "PJM_ROANOKE","time": "2022-11-02T10:20:00+00:00","rating": 545.67162111,"duration": "00:05:00"}]'
 	)
+
+  return PLACEHOLDER
+}
+
+async function _getForecastedEmissionLevels(region) {
+	// TODO - Add API call to Carbon Aware SDK
+  
+  const PLACEHOLDER = JSON.parse(`[{
+    "generatedAt": "2022-11-02T10:25:00+00:00",
+    "requestedAt": "2022-11-02T10:28:46.8644078+00:00",
+    "location": "eastus",
+    "dataStartAt": "2022-11-02T10:30:00+00:00",
+    "dataEndAt": "2022-11-03T10:30:00+00:00",
+    "windowSize": 5,
+    "optimalDataPoints": [
+      {
+        "location": "PJM_ROANOKE",
+        "timestamp": "2022-11-03T10:15:00+00:00",
+        "duration": 5,
+        "value": 544.8099506434546
+      }
+    ],
+    "forecastData": [
+      {
+        "location": "PJM_ROANOKE",
+        "timestamp": "2022-11-02T10:30:00+00:00",
+        "duration": 5,
+        "value": 547.3183851085558
+      },
+      {
+        "location": "PJM_ROANOKE",
+        "timestamp": "2022-11-02T10:35:00+00:00",
+        "duration": 5,
+        "value": 547.66173548531
+      }]
+    }]`)
 
   return PLACEHOLDER
 }
