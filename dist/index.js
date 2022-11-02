@@ -1268,6 +1268,7 @@ async function run() {
   core.info(`Lowest emission rating found within delay tolerance: ${LOWEST_FORECASTED_EMISSION_RATING.value} at ${LOWEST_FORECASTED_EMISSION_RATING.timestamp}`)
   core.debug(LOWEST_FORECASTED_EMISSION_RATING)
 
+  // Calculate how long the job should be delayed (in minutes)
   const JOB_DELAY = await _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING)
   
   core.info(`Calculated job delay: ${JOB_DELAY} minutes`)
