@@ -1246,11 +1246,13 @@ async function run() {
 
 	// Get current emission level at runner location
 	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(RUNNER_LOCATION)
-	core.info(CURRENT_EMISSION_RATING[0].rating)
+	core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING[0].rating}`)
 
 	// Get forecasted emission level at runner location
-	const FORECASTED_EMISSION_RATING = await _getForecastedEmissionLevels(RUNNER_LOCATION)
-	core.info(FORECASTED_EMISSION_RATING)
+  // We don't want to print everything to console by default, to reduce noise. Rather print it to debug log.
+	const FORECASTED_EMISSION_RATINGS = await _getForecastedEmissionLevels(RUNNER_LOCATION)
+	core.info(`Successfully fetched forecasted emission ratings in region ${RUNNER_LOCATION}`)
+  core.debug(`Forecasted emission ratings in region ${RUNNER_LOCATION}: ${JSON.stringify(FORECASTED_EMISSION_RATINGS)}`)
 	
   // Determine whether to run the job or not
     // Things to tak into account:
