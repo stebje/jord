@@ -43,7 +43,11 @@ async function run() {
   
   core.info(`Lowest emission rating found within delay tolerance: ${LOWEST_FORECASTED_EMISSION_RATING.value} at ${LOWEST_FORECASTED_EMISSION_RATING.timestamp}`)
   core.debug(LOWEST_FORECASTED_EMISSION_RATING)
+
+  const JOB_DELAY = await _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING)
   
+  core.info(`Calculated job delay: ${JOB_DELAY} minutes`)
+
   // Determine whether to run the job or not
     // Things to tak into account:
     // - current emission level
@@ -161,4 +165,25 @@ async function _getLowestForecastedEmission(forecastData) {
   }
   )
   return lowestForecast
+}
+
+async function _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING) {
+  if (LOWEST_FORECASTED_EMISSION_RATING.value < CURRENT_EMISSION_RATING.rating) {
+    let jobDelay = _getTimeDiffMinutes(CURRENT_EMISSION_RATING.time, LOWEST_FORECASTED_EMISSION_RATING.timestamp)
+    
+    return jobDelay
+  } else {
+    let jobDelay = 0
+
+    return jobDelay
+  }
+}
+
+async function _getTimeDiffMinutes(time1, time2) {
+  let dt1 = new Date(time1)
+  let dt2 = new Date(time2)
+  let timeDiffRaw = (dt2.getTime() - dt1.getTime()) / 1000 / 60
+  let timeDiff = Math.round(timeDiffRaw)
+
+  return timeDiff
 }
