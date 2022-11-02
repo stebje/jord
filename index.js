@@ -29,7 +29,21 @@ async function run() {
 	const FORECASTED_EMISSION_RATINGS = await _getForecastedEmissionLevels(RUNNER_LOCATION)
 	core.info(`Successfully fetched forecasted emission ratings in region ${RUNNER_LOCATION}`)
   core.debug(`Forecasted emission ratings in region ${RUNNER_LOCATION}: ${JSON.stringify(FORECASTED_EMISSION_RATINGS)}`)
-	
+
+  // Get all forecasted emission ratings within the tolerance window (in minutes)
+  core.info(`Delay tolerance: ${delayTolerance} minutes`)
+  
+  const FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE = await _getForecastWithinDelayTolerance(FORECASTED_EMISSION_RATINGS[0].forecastData, delayTolerance)
+  
+  core.info(`Found ${FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE.length} forecasted emission ratings within the delay tolerance`)
+  core.debug(FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE)
+
+  // Find the lowest emission rating available within the tolerance window
+  const LOWEST_FORECASTED_EMISSION_RATING = await _getLowestForecastedEmission(FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE)
+  
+  core.info(`Lowest emission rating found within delay tolerance: ${LOWEST_FORECASTED_EMISSION_RATING.value} at ${LOWEST_FORECASTED_EMISSION_RATING.timestamp}`)
+  core.debug(LOWEST_FORECASTED_EMISSION_RATING)
+  
   // Determine whether to run the job or not
     // Things to tak into account:
     // - current emission level
@@ -125,4 +139,26 @@ async function _getForecastedEmissionLevels(region) {
     }]`)
 
   return PLACEHOLDER
+}
+
+async function _getForecastWithinDelayTolerance(forecastData, delayTolerance) {
+  // Find all entries within delay tolerance in minutes
+  let maxTimeStamp = new Date(new Date().getTime() + delayTolerance * 60000)
+  let currentTime = new Date()
+
+  let forecastWithinTolerance = forecastData.filter((entry) => {
+    let forecastTimeStamp = new Date(entry.timestamp)
+    // We only want the forecasts that are in the future and within the delay tolerance
+    return forecastTimeStamp <= maxTimeStamp && forecastTimeStamp >= currentTime
+  }
+  )
+  return forecastWithinTolerance
+}
+
+async function _getLowestForecastedEmission(forecastData) {
+  let lowestForecast = forecastData.reduce((prev, current) => {
+    return (prev.value < current.value) ? prev : current
+  }
+  )
+  return lowestForecast
 }
