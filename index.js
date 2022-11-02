@@ -20,6 +20,26 @@ async function run() {
 	// Get Azure region corresponding to runner location
 	const RUNNER_LOCATION = await _getRunnerLocation(IP_INFO.region)
 	core.info(`Matching Azure region: ${RUNNER_LOCATION}`)
+
+  // Get current emission level at runner location
+	// TODO
+
+	// Get forecasted emission level at runner location
+  // TODO
+	
+  // Determine whether to run the job or not
+    // Things to tak into account:
+    // - current emission level
+    // - forecasted emission level
+    // - job type (e.g. cron, pull request, etc.)
+    // - job priority (e.g. high, medium, low)
+    // - job size (e.g. small, medium, large)
+    // - how much tolerance the user has in terms of delaying the job
+    // - depenencies on other jobs
+    // - ...
+
+	// If job is run, create job summary
+	// ...
 }
 
 run()
