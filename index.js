@@ -2,6 +2,7 @@
 const core = require('@actions/core')
 const { exec } = require('child_process')
 const github = require('@actions/github')
+const azureRegions = require('./data/azure-regions.json')
 
 async function run() {
   // TODO - Determine OS of runner

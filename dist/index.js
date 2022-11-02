@@ -1226,6 +1226,7 @@ exports.default = _default;
 const core = __webpack_require__(670)
 const { exec } = __webpack_require__(129)
 const github = __webpack_require__(77)
+const azureRegions = __webpack_require__(312)
 
 async function run() {
   // TODO - Determine OS of runner
@@ -2497,6 +2498,13 @@ function wrappy (fn, cb) {
   }
 }
 
+
+/***/ }),
+
+/***/ 312:
+/***/ (function(module) {
+
+module.exports = {"eastus":{"state":"Virginia","city":"Richmond"},"eastus2":{"state":"Virginia","city":"Richmond"},"eastus3":{"state":"Georgia","city":"Atlanta"},"centralus":{"state":"Iowa","city":"Des Moines"},"northcentralus":{"state":"Illinois","city":"Chicago"},"westcentralus":{"state":"Wyoming","city":"Cheyenne"},"southcentralus":{"state":"Texas","city":"San Antonio"},"westus":{"state":"California","city":"San Francisco"},"westus2":{"state":"Washington","city":"Moses Lake"},"westus3":{"state":"Arizona","city":"Phoenix"}};
 
 /***/ }),
 
