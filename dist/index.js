@@ -1250,7 +1250,7 @@ async function run() {
 
 	// Get forecasted emission level at runner location
 	const FORECASTED_EMISSION_RATING = await _getForecastedEmissionLevels(RUNNER_LOCATION)
-	core.info(FORECASTED_EMISSION_RATING[0].optimalDataPoints[0].value)
+	core.info(FORECASTED_EMISSION_RATING)
 	
   // Determine whether to run the job or not
     // Things to tak into account:
