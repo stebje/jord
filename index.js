@@ -1,6 +1,5 @@
 // Import the necessary dependencies
 const core = require('@actions/core')
-const { exec } = require('child_process')
 const github = require('@actions/github')
 const ipInfo = require('ipinfo')
 const azureRegions = require('./data/azure-regions.json')

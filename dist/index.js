@@ -1224,7 +1224,6 @@ exports.default = _default;
 
 // Import the necessary dependencies
 const core = __webpack_require__(670)
-const { exec } = __webpack_require__(129)
 const github = __webpack_require__(77)
 const ipInfo = __webpack_require__(901)
 const azureRegions = __webpack_require__(312)
@@ -1452,13 +1451,6 @@ function sha1(bytes) {
 
 var _default = sha1;
 exports.default = _default;
-
-/***/ }),
-
-/***/ 129:
-/***/ (function(module) {
-
-module.exports = require("child_process");
 
 /***/ }),
 
