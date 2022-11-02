@@ -1,5 +1,10 @@
 name: Jord
 description: A GitHub Action that helps move workloads into greener time periods
+inputs:
+  delay-tolerance:
+    description: Maximum number of minutes the job can be delayed
+    required: false
+    default: '5'
 runs:
   using: 'node16'
   main: 'dist/index.js'
