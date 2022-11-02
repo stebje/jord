@@ -1226,30 +1226,61 @@ exports.default = _default;
 const core = __webpack_require__(670)
 const { exec } = __webpack_require__(129)
 const github = __webpack_require__(77)
+const ipInfo = __webpack_require__(901)
 const azureRegions = __webpack_require__(312)
+const os = __webpack_require__(272)
 
 async function run() {
-  // TODO - Determine OS of runner
-  // const RUNNER_OS = await _getRunnerOS() { ... }
-  const RUNNER_OS = 'linux' // set to constant for now
-  
-  // Determine the public IP address of the runner machine
-  const PUBLIC_IP = await _getPublicIP(RUNNER_OS)
+	// Determine OS of runner
+	const RUNNER_PLATFORM = os.platform()
+	const RUNNER_OS = await _getRunnerOs(RUNNER_PLATFORM)
+	core.info(`Runner OS: ${RUNNER_OS}`)
 
-  // Get physical location of runner machine
-  // const RUNNER_LOCATION = await _getRunnerLocation(PUBLIC_IP) { ... }
+	// Get IP info of the runner machine
+	const IP_INFO = await _getIPInfo()
+	core.info(`Runner IP: ${IP_INFO.ip}`)
+	core.info(`Runner IP location: ${IP_INFO.region}`)
 
-  // Get current emission level at runner location
-  // const CURRENT_EMISSION_LEVEL = await _getEmissionLevel(RUNNER_LOCATION) { ... }
-
-  // Determine whether to run the job or not
-  // ...
-
-  // If job is run, create job summary
-  // ...
+	// Get Azure region corresponding to runner location
+	const RUNNER_LOCATION = await _getRunnerLocation(IP_INFO.region)
+	core.info(`Matching Azure region: ${RUNNER_LOCATION}`)
 }
 
 run()
+
+async function _getRunnerOs(platform) {
+	switch (platform) {
+		case 'linux':
+			return 'linux'
+		case 'darwin':
+			return 'macos'
+		case 'win32':
+			return 'windows'
+		default:
+			core.warning('Unable to determine the OS of the runner, the workflow will continue.')
+			return
+	}
+}
+
+async function _getIPInfo() {
+	const IPInfo = ipInfo()
+
+	return IPInfo
+}
+
+async function _getRunnerLocation(location) {
+	let matchingRegions = []
+
+	for (const region in azureRegions) {
+		if (azureRegions[region].state == location) {
+			matchingRegions.push(region)
+		}
+	}
+
+	// TODO - how to deal with multiple regions in the same state?
+	//   E.g. there are two azure datacenters in Virginia, but it's hard to get granular enough data to distinguish the two
+	return matchingRegions[0]
+}
 
 async function _getPublicIP(os) {
   // TODO: account for the different actions runners: macos, linux, windows
@@ -1332,6 +1363,28 @@ function getOctokit(token, options, ...additionalPlugins) {
 }
 exports.getOctokit = getOctokit;
 //# sourceMappingURL=github.js.map
+
+/***/ }),
+
+/***/ 83:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var debug;
+
+module.exports = function () {
+  if (!debug) {
+    try {
+      /* eslint global-require: off */
+      debug = __webpack_require__(596)("follow-redirects");
+    }
+    catch (error) { /* */ }
+    if (typeof debug !== "function") {
+      debug = function () { /* */ };
+    }
+  }
+  debug.apply(null, arguments);
+};
+
 
 /***/ }),
 
@@ -1431,6 +1484,57 @@ module.exports = require("child_process");
 
 module.exports = __webpack_require__(264);
 
+
+/***/ }),
+
+/***/ 158:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var noop = __webpack_require__(673),
+    sliced = __webpack_require__(729);
+
+/**
+ * assured
+ * Proxies the callback function.
+ *
+ * @name assured
+ * @function
+ * @param {Function} fn The callback function to proxy.
+ * @param {Promise} p A custom promise constructor (default: the built-in `Promise`).
+ * @returns {Function} The proxied callback function extended with:
+ *
+ *  - `resolver` (Function): The promise resolver.
+ *  - `assuredResolve` (Function): The resolve method.
+ *  - `assuredReject` (Function): The reject method.
+ *  - `_` (Promise): The promise object (used to `return` from your function).
+ *
+ */
+module.exports = function assured(fn, p) {
+    p = p || Promise;
+    fn = fn || noop;
+
+    var res = function res(err) {
+        fn.apply(res, arguments);
+        if (err) {
+            res.assuredReject(err);
+        } else {
+            res.assuredResolve.apply(res, sliced(arguments, 1));
+        }
+        return res._;
+    };
+
+    res.resolver = function (resolve, reject) {
+        res.assuredResolve = resolve;
+        res.assuredReject = reject;
+    };
+
+    res._ = new p(res.resolver);
+    res._.catch(noop);
+    return res;
+};
 
 /***/ }),
 
@@ -1581,6 +1685,13 @@ exports.RequestError = RequestError;
 
 /***/ }),
 
+/***/ 191:
+/***/ (function(module) {
+
+module.exports = require("querystring");
+
+/***/ }),
+
 /***/ 199:
 /***/ (function(module) {
 
@@ -1620,6 +1731,634 @@ module.exports = require("https");
 /***/ (function(module) {
 
 module.exports = require("punycode");
+
+/***/ }),
+
+/***/ 220:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+var url = __webpack_require__(414);
+var URL = url.URL;
+var http = __webpack_require__(605);
+var https = __webpack_require__(211);
+var Writable = __webpack_require__(413).Writable;
+var assert = __webpack_require__(357);
+var debug = __webpack_require__(83);
+
+// Create handlers that pass events from native requests
+var events = ["abort", "aborted", "connect", "error", "socket", "timeout"];
+var eventHandlers = Object.create(null);
+events.forEach(function (event) {
+  eventHandlers[event] = function (arg1, arg2, arg3) {
+    this._redirectable.emit(event, arg1, arg2, arg3);
+  };
+});
+
+var InvalidUrlError = createErrorType(
+  "ERR_INVALID_URL",
+  "Invalid URL",
+  TypeError
+);
+// Error types with codes
+var RedirectionError = createErrorType(
+  "ERR_FR_REDIRECTION_FAILURE",
+  "Redirected request failed"
+);
+var TooManyRedirectsError = createErrorType(
+  "ERR_FR_TOO_MANY_REDIRECTS",
+  "Maximum number of redirects exceeded"
+);
+var MaxBodyLengthExceededError = createErrorType(
+  "ERR_FR_MAX_BODY_LENGTH_EXCEEDED",
+  "Request body larger than maxBodyLength limit"
+);
+var WriteAfterEndError = createErrorType(
+  "ERR_STREAM_WRITE_AFTER_END",
+  "write after end"
+);
+
+// An HTTP(S) request that can be redirected
+function RedirectableRequest(options, responseCallback) {
+  // Initialize the request
+  Writable.call(this);
+  this._sanitizeOptions(options);
+  this._options = options;
+  this._ended = false;
+  this._ending = false;
+  this._redirectCount = 0;
+  this._redirects = [];
+  this._requestBodyLength = 0;
+  this._requestBodyBuffers = [];
+
+  // Attach a callback if passed
+  if (responseCallback) {
+    this.on("response", responseCallback);
+  }
+
+  // React to responses of native requests
+  var self = this;
+  this._onNativeResponse = function (response) {
+    self._processResponse(response);
+  };
+
+  // Perform the first request
+  this._performRequest();
+}
+RedirectableRequest.prototype = Object.create(Writable.prototype);
+
+RedirectableRequest.prototype.abort = function () {
+  abortRequest(this._currentRequest);
+  this.emit("abort");
+};
+
+// Writes buffered data to the current native request
+RedirectableRequest.prototype.write = function (data, encoding, callback) {
+  // Writing is not allowed if end has been called
+  if (this._ending) {
+    throw new WriteAfterEndError();
+  }
+
+  // Validate input and shift parameters if necessary
+  if (!isString(data) && !isBuffer(data)) {
+    throw new TypeError("data should be a string, Buffer or Uint8Array");
+  }
+  if (isFunction(encoding)) {
+    callback = encoding;
+    encoding = null;
+  }
+
+  // Ignore empty buffers, since writing them doesn't invoke the callback
+  // https://github.com/nodejs/node/issues/22066
+  if (data.length === 0) {
+    if (callback) {
+      callback();
+    }
+    return;
+  }
+  // Only write when we don't exceed the maximum body length
+  if (this._requestBodyLength + data.length <= this._options.maxBodyLength) {
+    this._requestBodyLength += data.length;
+    this._requestBodyBuffers.push({ data: data, encoding: encoding });
+    this._currentRequest.write(data, encoding, callback);
+  }
+  // Error when we exceed the maximum body length
+  else {
+    this.emit("error", new MaxBodyLengthExceededError());
+    this.abort();
+  }
+};
+
+// Ends the current native request
+RedirectableRequest.prototype.end = function (data, encoding, callback) {
+  // Shift parameters if necessary
+  if (isFunction(data)) {
+    callback = data;
+    data = encoding = null;
+  }
+  else if (isFunction(encoding)) {
+    callback = encoding;
+    encoding = null;
+  }
+
+  // Write data if needed and end
+  if (!data) {
+    this._ended = this._ending = true;
+    this._currentRequest.end(null, null, callback);
+  }
+  else {
+    var self = this;
+    var currentRequest = this._currentRequest;
+    this.write(data, encoding, function () {
+      self._ended = true;
+      currentRequest.end(null, null, callback);
+    });
+    this._ending = true;
+  }
+};
+
+// Sets a header value on the current native request
+RedirectableRequest.prototype.setHeader = function (name, value) {
+  this._options.headers[name] = value;
+  this._currentRequest.setHeader(name, value);
+};
+
+// Clears a header value on the current native request
+RedirectableRequest.prototype.removeHeader = function (name) {
+  delete this._options.headers[name];
+  this._currentRequest.removeHeader(name);
+};
+
+// Global timeout for all underlying requests
+RedirectableRequest.prototype.setTimeout = function (msecs, callback) {
+  var self = this;
+
+  // Destroys the socket on timeout
+  function destroyOnTimeout(socket) {
+    socket.setTimeout(msecs);
+    socket.removeListener("timeout", socket.destroy);
+    socket.addListener("timeout", socket.destroy);
+  }
+
+  // Sets up a timer to trigger a timeout event
+  function startTimer(socket) {
+    if (self._timeout) {
+      clearTimeout(self._timeout);
+    }
+    self._timeout = setTimeout(function () {
+      self.emit("timeout");
+      clearTimer();
+    }, msecs);
+    destroyOnTimeout(socket);
+  }
+
+  // Stops a timeout from triggering
+  function clearTimer() {
+    // Clear the timeout
+    if (self._timeout) {
+      clearTimeout(self._timeout);
+      self._timeout = null;
+    }
+
+    // Clean up all attached listeners
+    self.removeListener("abort", clearTimer);
+    self.removeListener("error", clearTimer);
+    self.removeListener("response", clearTimer);
+    if (callback) {
+      self.removeListener("timeout", callback);
+    }
+    if (!self.socket) {
+      self._currentRequest.removeListener("socket", startTimer);
+    }
+  }
+
+  // Attach callback if passed
+  if (callback) {
+    this.on("timeout", callback);
+  }
+
+  // Start the timer if or when the socket is opened
+  if (this.socket) {
+    startTimer(this.socket);
+  }
+  else {
+    this._currentRequest.once("socket", startTimer);
+  }
+
+  // Clean up on events
+  this.on("socket", destroyOnTimeout);
+  this.on("abort", clearTimer);
+  this.on("error", clearTimer);
+  this.on("response", clearTimer);
+
+  return this;
+};
+
+// Proxy all other public ClientRequest methods
+[
+  "flushHeaders", "getHeader",
+  "setNoDelay", "setSocketKeepAlive",
+].forEach(function (method) {
+  RedirectableRequest.prototype[method] = function (a, b) {
+    return this._currentRequest[method](a, b);
+  };
+});
+
+// Proxy all public ClientRequest properties
+["aborted", "connection", "socket"].forEach(function (property) {
+  Object.defineProperty(RedirectableRequest.prototype, property, {
+    get: function () { return this._currentRequest[property]; },
+  });
+});
+
+RedirectableRequest.prototype._sanitizeOptions = function (options) {
+  // Ensure headers are always present
+  if (!options.headers) {
+    options.headers = {};
+  }
+
+  // Since http.request treats host as an alias of hostname,
+  // but the url module interprets host as hostname plus port,
+  // eliminate the host property to avoid confusion.
+  if (options.host) {
+    // Use hostname if set, because it has precedence
+    if (!options.hostname) {
+      options.hostname = options.host;
+    }
+    delete options.host;
+  }
+
+  // Complete the URL object when necessary
+  if (!options.pathname && options.path) {
+    var searchPos = options.path.indexOf("?");
+    if (searchPos < 0) {
+      options.pathname = options.path;
+    }
+    else {
+      options.pathname = options.path.substring(0, searchPos);
+      options.search = options.path.substring(searchPos);
+    }
+  }
+};
+
+
+// Executes the next native request (initial or redirect)
+RedirectableRequest.prototype._performRequest = function () {
+  // Load the native protocol
+  var protocol = this._options.protocol;
+  var nativeProtocol = this._options.nativeProtocols[protocol];
+  if (!nativeProtocol) {
+    this.emit("error", new TypeError("Unsupported protocol " + protocol));
+    return;
+  }
+
+  // If specified, use the agent corresponding to the protocol
+  // (HTTP and HTTPS use different types of agents)
+  if (this._options.agents) {
+    var scheme = protocol.slice(0, -1);
+    this._options.agent = this._options.agents[scheme];
+  }
+
+  // Create the native request and set up its event handlers
+  var request = this._currentRequest =
+        nativeProtocol.request(this._options, this._onNativeResponse);
+  request._redirectable = this;
+  for (var event of events) {
+    request.on(event, eventHandlers[event]);
+  }
+
+  // RFC7230§5.3.1: When making a request directly to an origin server, […]
+  // a client MUST send only the absolute path […] as the request-target.
+  this._currentUrl = /^\//.test(this._options.path) ?
+    url.format(this._options) :
+    // When making a request to a proxy, […]
+    // a client MUST send the target URI in absolute-form […].
+    this._options.path;
+
+  // End a redirected request
+  // (The first request must be ended explicitly with RedirectableRequest#end)
+  if (this._isRedirect) {
+    // Write the request entity and end
+    var i = 0;
+    var self = this;
+    var buffers = this._requestBodyBuffers;
+    (function writeNext(error) {
+      // Only write if this request has not been redirected yet
+      /* istanbul ignore else */
+      if (request === self._currentRequest) {
+        // Report any write errors
+        /* istanbul ignore if */
+        if (error) {
+          self.emit("error", error);
+        }
+        // Write the next buffer if there are still left
+        else if (i < buffers.length) {
+          var buffer = buffers[i++];
+          /* istanbul ignore else */
+          if (!request.finished) {
+            request.write(buffer.data, buffer.encoding, writeNext);
+          }
+        }
+        // End the request if `end` has been called on us
+        else if (self._ended) {
+          request.end();
+        }
+      }
+    }());
+  }
+};
+
+// Processes a response from the current native request
+RedirectableRequest.prototype._processResponse = function (response) {
+  // Store the redirected response
+  var statusCode = response.statusCode;
+  if (this._options.trackRedirects) {
+    this._redirects.push({
+      url: this._currentUrl,
+      headers: response.headers,
+      statusCode: statusCode,
+    });
+  }
+
+  // RFC7231§6.4: The 3xx (Redirection) class of status code indicates
+  // that further action needs to be taken by the user agent in order to
+  // fulfill the request. If a Location header field is provided,
+  // the user agent MAY automatically redirect its request to the URI
+  // referenced by the Location field value,
+  // even if the specific status code is not understood.
+
+  // If the response is not a redirect; return it as-is
+  var location = response.headers.location;
+  if (!location || this._options.followRedirects === false ||
+      statusCode < 300 || statusCode >= 400) {
+    response.responseUrl = this._currentUrl;
+    response.redirects = this._redirects;
+    this.emit("response", response);
+
+    // Clean up
+    this._requestBodyBuffers = [];
+    return;
+  }
+
+  // The response is a redirect, so abort the current request
+  abortRequest(this._currentRequest);
+  // Discard the remainder of the response to avoid waiting for data
+  response.destroy();
+
+  // RFC7231§6.4: A client SHOULD detect and intervene
+  // in cyclical redirections (i.e., "infinite" redirection loops).
+  if (++this._redirectCount > this._options.maxRedirects) {
+    this.emit("error", new TooManyRedirectsError());
+    return;
+  }
+
+  // Store the request headers if applicable
+  var requestHeaders;
+  var beforeRedirect = this._options.beforeRedirect;
+  if (beforeRedirect) {
+    requestHeaders = Object.assign({
+      // The Host header was set by nativeProtocol.request
+      Host: response.req.getHeader("host"),
+    }, this._options.headers);
+  }
+
+  // RFC7231§6.4: Automatic redirection needs to done with
+  // care for methods not known to be safe, […]
+  // RFC7231§6.4.2–3: For historical reasons, a user agent MAY change
+  // the request method from POST to GET for the subsequent request.
+  var method = this._options.method;
+  if ((statusCode === 301 || statusCode === 302) && this._options.method === "POST" ||
+      // RFC7231§6.4.4: The 303 (See Other) status code indicates that
+      // the server is redirecting the user agent to a different resource […]
+      // A user agent can perform a retrieval request targeting that URI
+      // (a GET or HEAD request if using HTTP) […]
+      (statusCode === 303) && !/^(?:GET|HEAD)$/.test(this._options.method)) {
+    this._options.method = "GET";
+    // Drop a possible entity and headers related to it
+    this._requestBodyBuffers = [];
+    removeMatchingHeaders(/^content-/i, this._options.headers);
+  }
+
+  // Drop the Host header, as the redirect might lead to a different host
+  var currentHostHeader = removeMatchingHeaders(/^host$/i, this._options.headers);
+
+  // If the redirect is relative, carry over the host of the last request
+  var currentUrlParts = url.parse(this._currentUrl);
+  var currentHost = currentHostHeader || currentUrlParts.host;
+  var currentUrl = /^\w+:/.test(location) ? this._currentUrl :
+    url.format(Object.assign(currentUrlParts, { host: currentHost }));
+
+  // Determine the URL of the redirection
+  var redirectUrl;
+  try {
+    redirectUrl = url.resolve(currentUrl, location);
+  }
+  catch (cause) {
+    this.emit("error", new RedirectionError({ cause: cause }));
+    return;
+  }
+
+  // Create the redirected request
+  debug("redirecting to", redirectUrl);
+  this._isRedirect = true;
+  var redirectUrlParts = url.parse(redirectUrl);
+  Object.assign(this._options, redirectUrlParts);
+
+  // Drop confidential headers when redirecting to a less secure protocol
+  // or to a different domain that is not a superdomain
+  if (redirectUrlParts.protocol !== currentUrlParts.protocol &&
+     redirectUrlParts.protocol !== "https:" ||
+     redirectUrlParts.host !== currentHost &&
+     !isSubdomain(redirectUrlParts.host, currentHost)) {
+    removeMatchingHeaders(/^(?:authorization|cookie)$/i, this._options.headers);
+  }
+
+  // Evaluate the beforeRedirect callback
+  if (isFunction(beforeRedirect)) {
+    var responseDetails = {
+      headers: response.headers,
+      statusCode: statusCode,
+    };
+    var requestDetails = {
+      url: currentUrl,
+      method: method,
+      headers: requestHeaders,
+    };
+    try {
+      beforeRedirect(this._options, responseDetails, requestDetails);
+    }
+    catch (err) {
+      this.emit("error", err);
+      return;
+    }
+    this._sanitizeOptions(this._options);
+  }
+
+  // Perform the redirected request
+  try {
+    this._performRequest();
+  }
+  catch (cause) {
+    this.emit("error", new RedirectionError({ cause: cause }));
+  }
+};
+
+// Wraps the key/value object of protocols with redirect functionality
+function wrap(protocols) {
+  // Default settings
+  var exports = {
+    maxRedirects: 21,
+    maxBodyLength: 10 * 1024 * 1024,
+  };
+
+  // Wrap each protocol
+  var nativeProtocols = {};
+  Object.keys(protocols).forEach(function (scheme) {
+    var protocol = scheme + ":";
+    var nativeProtocol = nativeProtocols[protocol] = protocols[scheme];
+    var wrappedProtocol = exports[scheme] = Object.create(nativeProtocol);
+
+    // Executes a request, following redirects
+    function request(input, options, callback) {
+      // Parse parameters
+      if (isString(input)) {
+        var parsed;
+        try {
+          parsed = urlToOptions(new URL(input));
+        }
+        catch (err) {
+          /* istanbul ignore next */
+          parsed = url.parse(input);
+        }
+        if (!isString(parsed.protocol)) {
+          throw new InvalidUrlError({ input });
+        }
+        input = parsed;
+      }
+      else if (URL && (input instanceof URL)) {
+        input = urlToOptions(input);
+      }
+      else {
+        callback = options;
+        options = input;
+        input = { protocol: protocol };
+      }
+      if (isFunction(options)) {
+        callback = options;
+        options = null;
+      }
+
+      // Set defaults
+      options = Object.assign({
+        maxRedirects: exports.maxRedirects,
+        maxBodyLength: exports.maxBodyLength,
+      }, input, options);
+      options.nativeProtocols = nativeProtocols;
+      if (!isString(options.host) && !isString(options.hostname)) {
+        options.hostname = "::1";
+      }
+
+      assert.equal(options.protocol, protocol, "protocol mismatch");
+      debug("options", options);
+      return new RedirectableRequest(options, callback);
+    }
+
+    // Executes a GET request, following redirects
+    function get(input, options, callback) {
+      var wrappedRequest = wrappedProtocol.request(input, options, callback);
+      wrappedRequest.end();
+      return wrappedRequest;
+    }
+
+    // Expose the properties on the wrapped protocol
+    Object.defineProperties(wrappedProtocol, {
+      request: { value: request, configurable: true, enumerable: true, writable: true },
+      get: { value: get, configurable: true, enumerable: true, writable: true },
+    });
+  });
+  return exports;
+}
+
+/* istanbul ignore next */
+function noop() { /* empty */ }
+
+// from https://github.com/nodejs/node/blob/master/lib/internal/url.js
+function urlToOptions(urlObject) {
+  var options = {
+    protocol: urlObject.protocol,
+    hostname: urlObject.hostname.startsWith("[") ?
+      /* istanbul ignore next */
+      urlObject.hostname.slice(1, -1) :
+      urlObject.hostname,
+    hash: urlObject.hash,
+    search: urlObject.search,
+    pathname: urlObject.pathname,
+    path: urlObject.pathname + urlObject.search,
+    href: urlObject.href,
+  };
+  if (urlObject.port !== "") {
+    options.port = Number(urlObject.port);
+  }
+  return options;
+}
+
+function removeMatchingHeaders(regex, headers) {
+  var lastValue;
+  for (var header in headers) {
+    if (regex.test(header)) {
+      lastValue = headers[header];
+      delete headers[header];
+    }
+  }
+  return (lastValue === null || typeof lastValue === "undefined") ?
+    undefined : String(lastValue).trim();
+}
+
+function createErrorType(code, message, baseClass) {
+  // Create constructor
+  function CustomError(properties) {
+    Error.captureStackTrace(this, this.constructor);
+    Object.assign(this, properties || {});
+    this.code = code;
+    this.message = this.cause ? message + ": " + this.cause.message : message;
+  }
+
+  // Attach constructor and set default properties
+  CustomError.prototype = new (baseClass || Error)();
+  CustomError.prototype.constructor = CustomError;
+  CustomError.prototype.name = "Error [" + code + "]";
+  return CustomError;
+}
+
+function abortRequest(request) {
+  for (var event of events) {
+    request.removeListener(event, eventHandlers[event]);
+  }
+  request.on("error", noop);
+  request.abort();
+}
+
+function isSubdomain(subdomain, domain) {
+  assert(isString(subdomain) && isString(domain));
+  var dot = subdomain.length - domain.length - 1;
+  return dot > 0 && subdomain[dot] === "." && subdomain.endsWith(domain);
+}
+
+function isString(value) {
+  return typeof value === "string" || value instanceof String;
+}
+
+function isFunction(value) {
+  return typeof value === "function";
+}
+
+function isBuffer(value) {
+  return typeof value === "object" && ("length" in value);
+}
+
+// Exports
+module.exports = wrap({ http: http, https: https });
+module.exports.wrap = wrap;
+
 
 /***/ }),
 
@@ -2148,6 +2887,14 @@ module.exports = {
   }
 };
 
+
+
+/***/ }),
+
+/***/ 272:
+/***/ (function(module) {
+
+module.exports = eval("require")("node:os");
 
 
 /***/ }),
@@ -2958,6 +3705,157 @@ function removeHook(state, name, method) {
   state.registry[name].splice(index, 1);
 }
 
+
+/***/ }),
+
+/***/ 536:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var typpy = __webpack_require__(892),
+    Deffy = __webpack_require__(642);
+
+var Ul = module.exports = {
+    /**
+     * merge
+     * One level merge. Faster than `deepMerge`.
+     *
+     * @name merge
+     * @function
+     * @param dst {Object} The destination object.
+     * @param src {Object} The source object (usually defaults).
+     * @return {Object} The result object.
+     */
+    merge: function merge(dst, src, p) {
+        var res = {};
+
+        src = Deffy(src, {});
+        dst = Deffy(dst, {});
+
+        for (var k in src) {
+            res[k] = src[k];
+        }
+        for (var _k in dst) {
+            if (undefined === dst[_k]) {
+                continue;
+            }
+            res[_k] = dst[_k];
+        }
+
+        return res;
+    }
+
+    /**
+     * deepMerge
+     * Recursively merge the objects from arguments, returning a new object.
+     *
+     * Usage: `Ul.deepMerge(obj1, obj2, obj3, obj4, ..., objN)`
+     *
+     * @name deepMerge
+     * @function
+     * @return {Object} The merged objects.
+     */
+    ,
+    deepMerge: function deepMerge() {
+
+        var dst = {},
+            src = null,
+            p = null,
+            args = [].splice.call(arguments, 0);
+
+        while (args.length > 0) {
+            src = args.splice(-1)[0];
+            if (!typpy(src, Object)) {
+                continue;
+            }
+            for (p in src) {
+                if (!src.hasOwnProperty(p)) {
+                    continue;
+                }
+                if (typpy(src[p], Object)) {
+                    dst[p] = this.deepMerge(src[p], dst[p] || {});
+                } else {
+                    if (src[p] !== undefined) {
+                        dst[p] = src[p];
+                    }
+                }
+            }
+        }
+
+        return dst;
+    }
+
+    /**
+     * clone
+     * Deep clone of the provided item.
+     *
+     * @name clone
+     * @function
+     * @param {Anything} item The item that should be cloned
+     * @return {Anything} The cloned object
+     */
+    ,
+    clone: function clone(item) {
+
+        if (!item) {
+            return item;
+        }
+
+        var types = [Number, String, Boolean],
+            result = undefined;
+
+        for (var _i = 0; _i < types.length; ++_i) {
+            var type = types[_i];
+            if (item instanceof type) {
+                result = type(item);
+            }
+        }
+
+        if (typeof result == "undefined") {
+            if (Array.isArray(item)) {
+                result = [];
+                for (var i = 0; i < item.length; ++i) {
+                    result[i] = this.clone(item[i]);
+                }
+            } else if ((typeof item === "undefined" ? "undefined" : _typeof(item)) == "object") {
+                if (!item.prototype) {
+                    if (item instanceof Date) {
+                        result = new Date(item);
+                    } else {
+                        result = {};
+                        for (i in item) {
+                            result[i] = this.clone(item[i]);
+                        }
+                    }
+                } else {
+                    result = item;
+                }
+            } else {
+                result = item;
+            }
+        }
+
+        return result;
+    },
+    HOME_DIR: process.env[process.platform == "win32" ? "USERPROFILE" : "HOME"]
+
+    /**
+     * home
+     * Get the home directory path on any platform. The value can be
+     * accessed using `Ul.HOME_DIR` too.
+     *
+     * @name home
+     * @function
+     * @return {String} The home directory path.
+     */
+    , home: function home() {
+        return this.HOME_DIR;
+    }
+};
 
 /***/ }),
 
@@ -4304,6 +5202,14 @@ exports.paginatingEndpoints = paginatingEndpoints;
 
 /***/ }),
 
+/***/ 596:
+/***/ (function(module) {
+
+module.exports = eval("require")("debug");
+
+
+/***/ }),
+
 /***/ 605:
 /***/ (function(module) {
 
@@ -4446,6 +5352,137 @@ exports.default = _default;
 
 /***/ }),
 
+/***/ 642:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+// Dependencies
+var Typpy = __webpack_require__(892);
+
+/**
+ * Deffy
+ * Computes a final value by providing the input and default values.
+ *
+ * @name Deffy
+ * @function
+ * @param {Anything} input The input value.
+ * @param {Anything|Function} def The default value or a function getting the
+ * input value as first argument.
+ * @param {Object|Boolean} options The `empty` value or an object containing
+ * the following fields:
+ *
+ *  - `empty` (Boolean): Handles the input value as empty field (`input || default`). Default is `false`.
+ *
+ * @return {Anything} The computed value.
+ */
+function Deffy(input, def, options) {
+
+    // Default is a function
+    if (typeof def === "function") {
+        return def(input);
+    }
+
+    options = Typpy(options) === "boolean" ? {
+        empty: options
+    } : {
+        empty: false
+    };
+
+    // Handle empty
+    if (options.empty) {
+        return input || def;
+    }
+
+    // Return input
+    if (Typpy(input) === Typpy(def)) {
+        return input;
+    }
+
+    // Return the default
+    return def;
+}
+
+module.exports = Deffy;
+
+/***/ }),
+
+/***/ 651:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+// Dependencies
+
+var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
+
+var tinyreq = __webpack_require__(937),
+    ul = __webpack_require__(536),
+    noop = __webpack_require__(673);
+
+/**
+ * jsonRequest
+ * Creates the http(s) request and parses the response.
+ *
+ * @name jsonRequest
+ * @function
+ * @param {String|Object} options A string representing the request url or an object passed to the `tinyreq` function.
+ * @param {Object} data The request data object.
+ * @param {Function} callback The callback function.
+ * @return {Object} The request object.
+ */
+module.exports = function jsonRequest(options, data, callback) {
+
+    // Handle options as string
+    if (typeof options === "string") {
+        options = {
+            url: options
+        };
+    }
+
+    if (typeof data === "function") {
+        callback = data;
+        data = undefined;
+    }
+
+    options.data = options.data || data;
+
+    // Stringify the data
+    if (_typeof(options.data) === "object") {
+        options.data = JSON.stringify(options.data);
+    }
+
+    options = ul.deepMerge(options, {
+        headers: {
+            "Content-Type": "application/json"
+        }
+    });
+
+    var maybeCallback = callback ? function (err, body, res) {
+        if (err) {
+            return callback(err, body, res);
+        }
+        if (body) {
+            try {
+                body = JSON.parse(body);
+            } catch (e) {
+                return callback(e, body, res);
+            }
+        }
+        callback(null, body, res);
+    } : noop;
+
+    var prom = tinyreq(options, maybeCallback).then(function (body) {
+        return JSON.parse(body);
+    });
+    prom.catch(noop);
+    return prom;
+};
+
+/***/ }),
+
 /***/ 666:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -4466,6 +5503,48 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 const v3 = (0, _v.default)('v3', 0x30, _md.default);
 var _default = v3;
 exports.default = _default;
+
+/***/ }),
+
+/***/ 667:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var noop6 = __webpack_require__(673);
+
+(function () {
+    var NAME_FIELD = "name";
+
+    if (typeof noop6.name === "string") {
+        return;
+    }
+
+    try {
+        Object.defineProperty(Function.prototype, NAME_FIELD, {
+            get: function get() {
+                var nameMatch = this.toString().trim().match(/^function\s*([^\s(]+)/);
+                var name = nameMatch ? nameMatch[1] : "";
+                Object.defineProperty(this, NAME_FIELD, { value: name });
+                return name;
+            }
+        });
+    } catch (e) {}
+})();
+
+/**
+ * functionName
+ * Get the function name.
+ *
+ * @name functionName
+ * @function
+ * @param {Function} input The input function.
+ * @returns {String} The function name.
+ */
+module.exports = function functionName(input) {
+    return input.name;
+};
 
 /***/ }),
 
@@ -4816,6 +5895,16 @@ Object.defineProperty(exports, "toPosixPath", { enumerable: true, get: function 
 Object.defineProperty(exports, "toWin32Path", { enumerable: true, get: function () { return path_utils_1.toWin32Path; } });
 Object.defineProperty(exports, "toPlatformPath", { enumerable: true, get: function () { return path_utils_1.toPlatformPath; } });
 //# sourceMappingURL=core.js.map
+
+/***/ }),
+
+/***/ 673:
+/***/ (function(module) {
+
+"use strict";
+
+
+module.exports = function () {};
 
 /***/ }),
 
@@ -6732,6 +7821,46 @@ class OidcClient {
 }
 exports.OidcClient = OidcClient;
 //# sourceMappingURL=oidc-utils.js.map
+
+/***/ }),
+
+/***/ 729:
+/***/ (function(module) {
+
+
+/**
+ * An Array.prototype.slice.call(arguments) alternative
+ *
+ * @param {Object} args something with a length
+ * @param {Number} slice
+ * @param {Number} sliceEnd
+ * @api public
+ */
+
+module.exports = function (args, slice, sliceEnd) {
+  var ret = [];
+  var len = args.length;
+
+  if (0 === len) return ret;
+
+  var start = slice < 0
+    ? Math.max(0, slice + len)
+    : slice || 0;
+
+  if (sliceEnd !== undefined) {
+    len = sliceEnd < 0
+      ? sliceEnd + len
+      : sliceEnd
+  }
+
+  while (len-- > start) {
+    ret[len - start] = args[len];
+  }
+
+  return ret;
+}
+
+
 
 /***/ }),
 
@@ -8675,6 +9804,180 @@ exports.getOctokitOptions = getOctokitOptions;
 
 /***/ }),
 
+/***/ 892:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+__webpack_require__(667);
+
+/**
+ * Typpy
+ * Gets the type of the input value or compares it
+ * with a provided type.
+ *
+ * Usage:
+ *
+ * ```js
+ * Typpy({}) // => "object"
+ * Typpy(42, Number); // => true
+ * Typpy.get([], "array"); => true
+ * ```
+ *
+ * @name Typpy
+ * @function
+ * @param {Anything} input The input value.
+ * @param {Constructor|String} target The target type.
+ * It could be a string (e.g. `"array"`) or a
+ * constructor (e.g. `Array`).
+ * @return {String|Boolean} It returns `true` if the
+ * input has the provided type `target` (if was provided),
+ * `false` if the input type does *not* have the provided type
+ * `target` or the stringified type of the input (always lowercase).
+ */
+function Typpy(input, target) {
+    if (arguments.length === 2) {
+        return Typpy.is(input, target);
+    }
+    return Typpy.get(input, true);
+}
+
+/**
+ * Typpy.is
+ * Checks if the input value has a specified type.
+ *
+ * @name Typpy.is
+ * @function
+ * @param {Anything} input The input value.
+ * @param {Constructor|String} target The target type.
+ * It could be a string (e.g. `"array"`) or a
+ * constructor (e.g. `Array`).
+ * @return {Boolean} `true`, if the input has the same
+ * type with the target or `false` otherwise.
+ */
+Typpy.is = function (input, target) {
+    return Typpy.get(input, typeof target === "string") === target;
+};
+
+/**
+ * Typpy.get
+ * Gets the type of the input value. This is used internally.
+ *
+ * @name Typpy.get
+ * @function
+ * @param {Anything} input The input value.
+ * @param {Boolean} str A flag to indicate if the return value
+ * should be a string or not.
+ * @return {Constructor|String} The input value constructor
+ * (if any) or the stringified type (always lowercase).
+ */
+Typpy.get = function (input, str) {
+
+    if (typeof input === "string") {
+        return str ? "string" : String;
+    }
+
+    if (null === input) {
+        return str ? "null" : null;
+    }
+
+    if (undefined === input) {
+        return str ? "undefined" : undefined;
+    }
+
+    if (input !== input) {
+        return str ? "nan" : NaN;
+    }
+
+    return str ? input.constructor.name.toLowerCase() : input.constructor;
+};
+
+module.exports = Typpy;
+
+/***/ }),
+
+/***/ 901:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var request = __webpack_require__(651);
+
+/**
+ * ipInfo
+ * Makes requests to the ipinfo.io resources.
+ *
+ * @name ipInfo
+ * @function
+ * @param {String} type An optional string parameter that can be:
+ *
+ *  - An ip (e.g. `"8.8.8.8"`)
+ *  - An ip and the a field (e.g. `"8.8.8.8/org"`)
+ *
+ * @param {String} token The token used if you have to make an authorized request.
+ * @param {Function} callback The callback function.
+ */
+var ipInfo = module.exports = function (type, token, callback) {
+    var url = null;
+
+    if (typeof token === "function") {
+        callback = token;
+        token = undefined;
+    }
+
+    if (typeof type === "function") {
+        callback = type;
+        type = "";
+    }
+
+    if (typeof token === "string") {
+        if (!type) {
+            url = ipInfo.HOSTNAME_SSL + "json" + ipInfo.TOKEN_PREFIX + token;
+        } else if (ipInfo.IP_REGEX.test(type)) {
+            url = ipInfo.HOSTNAME_SSL + type + "/json" + ipInfo.TOKEN_PREFIX + token;
+        } else {
+            url = ipInfo.HOSTNAME_SSL + type + ipInfo.TOKEN_PREFIX + token;
+        }
+    } else {
+        if (!type) {
+            url = ipInfo.HOSTNAME + "json";
+        } else if (ipInfo.IP_REGEX.test(type)) {
+            url = ipInfo.HOSTNAME + type + "/json";
+        } else {
+            url = ipInfo.HOSTNAME + type;
+        }
+    }
+
+    return new Promise(function (resolve, reject) {
+        request(url, function (err, body) {
+            if (err && err.message && err.message.startsWith("Unexpected token")) {
+                err = null;
+            }
+            if (err) {
+                if (!callback) {
+                    callback = reject;
+                }
+                return callback(err);
+            } else {
+                if (callback) {
+                    callback(null, body);
+                } else {
+                    resolve(body);
+                }
+            }
+        });
+    });
+};
+
+ipInfo.HOSTNAME = "http://ipinfo.io/";
+ipInfo.HOSTNAME_SSL = "https://ipinfo.io/";
+ipInfo.TOKEN_PREFIX = "?token=";
+ipInfo.IP_REGEX = /^\b(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\b$/;
+
+/***/ }),
+
 /***/ 902:
 /***/ (function(__unusedmodule, exports, __webpack_require__) {
 
@@ -9284,6 +10587,132 @@ class HttpClient {
 exports.HttpClient = HttpClient;
 const lowercaseKeys = (obj) => Object.keys(obj).reduce((c, k) => ((c[k.toLowerCase()] = obj[k]), c), {});
 //# sourceMappingURL=index.js.map
+
+/***/ }),
+
+/***/ 937:
+/***/ (function(module, __unusedexports, __webpack_require__) {
+
+"use strict";
+
+
+var http = __webpack_require__(220).http,
+    https = __webpack_require__(220).https,
+    ul = __webpack_require__(536),
+    url = __webpack_require__(414),
+    queryString = __webpack_require__(191),
+    events = __webpack_require__(614),
+    EventEmitter = events.EventEmitter,
+    assured = __webpack_require__(158),
+    noop = __webpack_require__(673),
+    zlib = __webpack_require__(761);
+
+/**
+ * tinyreq
+ * Creates http(s) requests.
+ *
+ * @name tinyreq
+ * @function
+ * @param {String|Object} options A string being the request url or an object containing the following fields:
+ *
+ *  - `url` (String): The request url.
+ *  - `method` (String): The request method.
+ *  - `data` (Object): The request POST data.
+ *  - `encoding` (String): The response encoding type.
+ *  - `data_encoding` (String): The request encoding type.
+ *
+ * @param {Function} callback The callback function called (with `error` and `data` parameters).
+ * @return {EventEmitter} An event emitter you can use for listening for the `data`, `error` and `end` events.
+ */
+module.exports = function tinyreq(options, callback) {
+
+    // Handle options as string
+    if (typeof options === "string") {
+        options = {
+            url: options
+        };
+    }
+
+    // Merge options
+    options = ul.deepMerge(options, ul.clone(url.parse(options.url)), {
+        method: options.method ? options.method : options.data ? "POST" : "GET",
+        headers: {},
+        encoding: "utf8"
+    });
+
+    var _done = false;
+
+    // Unique callback
+    var opt_callback = assured(function (err, data, res) {
+        if (_done) {
+            return;
+        }
+        _done = true;
+        if (typeof callback !== "function") {
+            return;
+        }
+        callback(err, data, res);
+    });
+
+    // Handle post data
+    if (options.data && options.data.constructor === Object) {
+        options.data = queryString.stringify(options.data);
+    }
+
+    if (typeof options.data === "string") {
+        options.headers["Content-Length"] = Buffer.byteLength(options.data);
+    }
+
+    var str = new EventEmitter();
+
+    // Create the request
+    var request = (options.protocol === "http:" ? http : https).request(options, function (res) {
+        var body = [],
+            bodyLength = 0;
+
+        var isGzipped = res.headers["content-encoding"] === "gzip";
+
+        var resStream = res;
+        if (isGzipped) {
+            resStream = res.pipe(zlib.createGunzip());
+        } else {
+            options.encoding && res.setEncoding(options.encoding);
+        }
+
+        if (typeof callback === "function") {
+            resStream.on("data", function (data) {
+                body.push(data);
+                bodyLength += data.length;
+            });
+        }
+
+        resStream.on("data", function (data) {
+            str.emit("data", data);
+        }).on("error", function (e) {
+            str.emit("error", e);
+            opt_callback(e, null, res);
+        }).on("end", function () {
+            str.emit("end");
+            body = options.encoding === null || options.encoding === "buffer" ? Buffer.concat(body, bodyLength) : body.join("");
+            opt_callback(null, body, res);
+        });
+    }).on("error", function (e) {
+        opt_callback(e, null, null);
+    });
+
+    // Handle post data
+    if (options.data) {
+        request.write(options.data, options.data_encoding);
+    }
+
+    request.end();
+    str.then = function (fn) {
+        callback = callback || noop;
+        return opt_callback._.then(fn);
+    };
+    str.catch = opt_callback._.catch.bind(opt_callback._);
+    return str;
+};
 
 /***/ }),
 
