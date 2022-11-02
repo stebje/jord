@@ -1244,8 +1244,9 @@ async function run() {
 	const RUNNER_LOCATION = await _getRunnerLocation(IP_INFO.region)
 	core.info(`Matching Azure region: ${RUNNER_LOCATION}`)
 
-  // Get current emission level at runner location
-	// TODO
+	// Get current emission level at runner location
+	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(RUNNER_LOCATION)
+	core.info(CURRENT_EMISSION_RATING[0].rating)
 
 	// Get forecasted emission level at runner location
   // TODO
@@ -1301,6 +1302,15 @@ async function _getRunnerLocation(location) {
 	return matchingRegions[0]
 }
 
+async function _getCurrentEmissionLevel(region) {
+	// TODO - Add API call to Carbon Aware SDK
+  
+  const PLACEHOLDER = JSON.parse(
+		'[{"location": "PJM_ROANOKE","time": "2022-11-02T10:20:00+00:00","rating": 545.67162111,"duration": "00:05:00"}]'
+	)
+
+  return PLACEHOLDER
+}
 
 /***/ }),
 
