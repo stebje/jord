@@ -1,0 +1,42 @@
+{
+  "eastus": {
+    "state": "Virginia",
+    "city": "Richmond"
+  },
+  "eastus2": {
+    "state": "Virginia",
+    "city": "Richmond"
+  },
+  "eastus3": {
+    "state": "Georgia",
+    "city": "Atlanta"
+  },
+  "centralus": {
+    "state": "Iowa",
+    "city": "Des Moines"
+  },
+  "northcentralus": {
+    "state": "Illinois",
+    "city": "Chicago"
+  },
+  "westcentralus": {
+    "state": "Wyoming",
+    "city": "Cheyenne"
+  },
+  "southcentralus": {
+    "state": "Texas",
+    "city": "San Antonio"
+  },
+  "westus": {
+    "state": "California",
+    "city": "San Francisco"
+  },
+  "westus2": {
+    "state": "Washington",
+    "city": "Moses Lake"
+  },
+  "westus3": {
+    "state": "Arizona",
+    "city": "Phoenix"
+  }
+}

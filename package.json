@@ -4,7 +4,8 @@
   "description": "A GitHub Action that helps move workloads into greener time periods",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "ncc build index.js -o dist"
   },
   "repository": {
     "type": "git",
@@ -20,5 +21,10 @@
   "bugs": {
     "url": "https://github.com/stebje/jord/issues"
   },
-  "homepage": "https://github.com/stebje/jord#readme"
+  "homepage": "https://github.com/stebje/jord#readme",
+  "dependencies": {
+    "@actions/core": "^1.10.0",
+    "@actions/github": "^5.1.1",
+    "ipinfo": "^1.5.1"
+  }
 }
