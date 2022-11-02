@@ -1230,6 +1230,9 @@ const azureRegions = __webpack_require__(312)
 const os = __webpack_require__(272)
 
 async function run() {
+  // Get action input parameters
+  const delayTolerance = parseInt(core.getInput('delay-tolerance'))
+  
 	// Determine OS of runner
 	const RUNNER_PLATFORM = os.platform()
 	const RUNNER_OS = await _getRunnerOs(RUNNER_PLATFORM)
