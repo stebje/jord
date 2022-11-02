@@ -1246,7 +1246,7 @@ async function run() {
 
 	// Get current emission level at runner location
 	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(RUNNER_LOCATION)
-	core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING[0].rating}`)
+	core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING.rating}`)
 
 	// Get forecasted emission level at runner location
   // We don't want to print everything to console by default, to reduce noise. Rather print it to debug log.
@@ -1330,7 +1330,7 @@ async function _getCurrentEmissionLevel(region) {
 		'[{"location": "PJM_ROANOKE","time": "2022-11-02T10:20:00+00:00","rating": 545.67162111,"duration": "00:05:00"}]'
 	)
 
-  return PLACEHOLDER
+  return PLACEHOLDER[0]
 }
 
 async function _getForecastedEmissionLevels(region) {
