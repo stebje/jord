@@ -1,5 +1,5 @@
-name: 'Jord'
-description: 'Do awesome, green stuff'
+name: Jord
+description: A GitHub Action that helps move workloads into greener time periods
 runs:
   using: 'node16'
   main: 'dist/index.js'
