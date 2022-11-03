@@ -1,6 +1,9 @@
 name: Jord
 description: A GitHub Action that helps move workloads into greener time periods
 inputs:
+  token:
+    description: A token with appropriate permissions (see documentation)
+    required: true
   delay-tolerance:
     description: Maximum number of minutes the job can be delayed
     required: false
