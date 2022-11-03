@@ -68,7 +68,7 @@ async function run() {
   if (JOB_DELAY == 0) {
     core.info(`Current emission rating is lower than the lowest forecasted emission rating. No delay required.`)
   } else {
-    core.notice(`Current emission rating (${CURRENT_EMISSION_RATING}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING}). Delaying job for ${JOB_DELAY} minutes.`)
+    core.notice(`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). Delaying job for ${JOB_DELAY} minutes.`)
     
     await _delayJob(JOB_DELAY, octokit, github)
   }
