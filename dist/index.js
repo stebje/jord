@@ -1304,6 +1304,9 @@ async function run() {
   const token = core.getInput('token')
   const delayTolerance = parseInt(core.getInput('delay-tolerance'))
   const baseUrlCarbonApi = core.getInput('base-url-carbon-aware-api')
+
+  // Instantiate octokit client
+	const octokit = github.getOctokit(token)
   
 	// Determine OS of runner
 	const RUNNER_PLATFORM = os.platform()
@@ -1352,6 +1355,16 @@ async function run() {
   const JOB_DELAY = await _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING)
   
   core.info(`Calculated job delay: ${JOB_DELAY} minutes`)
+
+  // If the current emission rating is lower than any of the forecasted ones, then there's no need to delay
+  // Otherwise, delay the job using a repo environment for the calculated amount of time
+  if (JOB_DELAY == 0) {
+    core.info(`Current emission rating is lower than the lowest forecasted emission rating. No delay required.`)
+  } else {
+    core.notice(`Current emission rating (${CURRENT_EMISSION_RATING}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING}). Delaying job for ${JOB_DELAY} minutes.`)
+    
+    await _delayJob(JOB_DELAY, octokit, github)
+  }
 }
 
 run()
@@ -1440,6 +1453,27 @@ async function _getTimeDiffMinutes(time1, time2) {
   let timeDiff = Math.round(timeDiffRaw)
 
   return timeDiff
+}
+
+async function _delayJob(minutes, octokit, github) {
+  // First we need to cancel the current workflow
+  // There's no support currently for cancelling individual jobs, so we need to cancel the entire workflow
+
+  await octokit.rest.actions.cancelWorkflowRun({
+    owner: github.context.repo.owner,
+    repo: github.context.repo.repo,
+    run_id: github.context.runId
+  })
+
+  // Create environment with a set wait timer
+  // This is how we can use native GitHub Actions functionality to delay the job
+  // TODO - find a better naming convention for the environment to avoid several jobs targeting and editing the same environment
+	await octokit.rest.repos.createOrUpdateEnvironment({
+		owner: github.context.repo.owner,
+		repo: github.context.repo.repo,
+		environment_name: 'green-env',
+		wait_timer: minutes,
+	})
 }
 
 /***/ }),
