@@ -1320,7 +1320,7 @@ async function run() {
 	core.info(`Matching Azure region: ${RUNNER_LOCATION}`)
 
 	// Get current emission level at runner location
-	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(RUNNER_LOCATION)
+	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(baseUrlCarbonApi, RUNNER_LOCATION)
 	core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING.rating}`)
 
 	// Get forecasted emission level at runner location
@@ -1399,14 +1399,9 @@ async function _getRunnerLocation(location) {
 	return matchingRegions[0]
 }
 
-async function _getCurrentEmissionLevel(region) {
-	// TODO - Add API call to Carbon Aware SDK
-  
-  const PLACEHOLDER = JSON.parse(
-		'[{"location": "PJM_ROANOKE","time": "2022-11-02T10:20:00+00:00","rating": 545.67162111,"duration": "00:05:00"}]'
-	)
-
-  return PLACEHOLDER[0]
+async function _getCurrentEmissionLevel(apiUrl, region) {
+  const response = await axios.get(`${apiUrl}/emissions/bylocations/best?location=${region}`)
+  return response.data[0]
 }
 
 async function _getForecastedEmissionLevels(region) {
