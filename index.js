@@ -55,20 +55,6 @@ async function run() {
   const JOB_DELAY = await _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING)
   
   core.info(`Calculated job delay: ${JOB_DELAY} minutes`)
-
-  // Determine whether to run the job or not
-    // Things to tak into account:
-    // - current emission level
-    // - forecasted emission level
-    // - job type (e.g. cron, pull request, etc.)
-    // - job priority (e.g. high, medium, low)
-    // - job size (e.g. small, medium, large)
-    // - how much tolerance the user has in terms of delaying the job
-    // - depenencies on other jobs
-    // - ...
-
-	// If job is run, create job summary
-	// ...
 }
 
 run()
@@ -118,7 +104,6 @@ async function _getForecastedEmissionLevels(apiUrl, region) {
   }
 
 async function _getForecastWithinDelayTolerance(forecastData, delayTolerance) {
-  // Find all entries within delay tolerance in minutes
   let maxTimeStamp = new Date(new Date().getTime() + delayTolerance * 60000)
   let currentTime = new Date()
 
