@@ -1359,7 +1359,7 @@ async function run() {
   // If the current emission rating is lower than any of the forecasted ones, then there's no need to delay
   // Otherwise, delay the job using a repo environment for the calculated amount of time
   if (JOB_DELAY == 0) {
-    core.info(`Current emission rating is lower than the lowest forecasted emission rating. No delay required.`)
+    core.info(`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is lower than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). No delay required.`)
   } else {
     core.notice(`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). Delaying job for ${JOB_DELAY} minutes.`)
     
