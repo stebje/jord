@@ -15,20 +15,24 @@ async function run() {
 	// Determine OS of runner
 	const RUNNER_PLATFORM = os.platform()
 	const RUNNER_OS = await _getRunnerOs(RUNNER_PLATFORM)
-	core.info(`Runner OS: ${RUNNER_OS}`)
+	
+  core.info(`Runner OS: ${RUNNER_OS}`)
 
 	// Get IP info of the runner machine
 	const IP_INFO = await _getIPInfo()
-	core.info(`Runner IP: ${IP_INFO.ip}`)
+	
+  core.info(`Runner IP: ${IP_INFO.ip}`)
 	core.info(`Runner IP location: ${IP_INFO.region}`)
 
 	// Get Azure region corresponding to runner location
 	const RUNNER_LOCATION = await _getRunnerLocation(IP_INFO.region)
-	core.info(`Matching Azure region: ${RUNNER_LOCATION}`)
+	
+  core.info(`Matching Azure region: ${RUNNER_LOCATION}`)
 
 	// Get current emission level at runner location
 	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(baseUrlCarbonApi, RUNNER_LOCATION)
-	core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING.rating}`)
+	
+  core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING.rating}`)
 
 	// Get forecasted emission level at runner location
   // We don't want to print everything to console by default, to reduce noise. Rather print it to debug log.
