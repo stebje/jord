@@ -4,6 +4,7 @@ const github = require('@actions/github')
 const ipInfo = require('ipinfo')
 const azureRegions = require('./data/azure-regions.json')
 const os = require('node:os')
+const axios = require('axios').default
 
 async function run() {
   // Get action input parameters
