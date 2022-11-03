@@ -1301,7 +1301,9 @@ const axios = __webpack_require__(144).default
 
 async function run() {
   // Get action input parameters
+  const token = core.getInput('token')
   const delayTolerance = parseInt(core.getInput('delay-tolerance'))
+  const baseUrlCarbonApi = core.getInput('base-url-carbon-aware-api')
   
 	// Determine OS of runner
 	const RUNNER_PLATFORM = os.platform()

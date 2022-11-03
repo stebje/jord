@@ -8,6 +8,10 @@ inputs:
     description: Maximum number of minutes the job can be delayed
     required: false
     default: '5'
+  base-url-carbon-aware-api:
+    description: The URL of the host where the Carbon Aware WebAPI is hosted (see documentation)
+    required: true
+    default: 'https://carbon-aware-api.azurewebsites.net'
 runs:
   using: 'node16'
   main: 'dist/index.js'
