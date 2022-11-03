@@ -1325,8 +1325,9 @@ async function run() {
 
 	// Get forecasted emission level at runner location
   // We don't want to print everything to console by default, to reduce noise. Rather print it to debug log.
-	const FORECASTED_EMISSION_RATINGS = await _getForecastedEmissionLevels(RUNNER_LOCATION)
-	core.info(`Successfully fetched forecasted emission ratings in region ${RUNNER_LOCATION}`)
+	const FORECASTED_EMISSION_RATINGS = await _getForecastedEmissionLevels(baseUrlCarbonApi, RUNNER_LOCATION)
+	
+  core.info(`Successfully fetched forecasted emission ratings in region ${RUNNER_LOCATION}`)
   core.debug(`Forecasted emission ratings in region ${RUNNER_LOCATION}: ${JSON.stringify(FORECASTED_EMISSION_RATINGS)}`)
 
   // Get all forecasted emission ratings within the tolerance window (in minutes)
@@ -1404,41 +1405,10 @@ async function _getCurrentEmissionLevel(apiUrl, region) {
   return response.data[0]
 }
 
-async function _getForecastedEmissionLevels(region) {
-	// TODO - Add API call to Carbon Aware SDK
-  
-  const PLACEHOLDER = JSON.parse(`[{
-    "generatedAt": "2022-11-02T10:25:00+00:00",
-    "requestedAt": "2022-11-02T10:28:46.8644078+00:00",
-    "location": "eastus",
-    "dataStartAt": "2022-11-02T10:30:00+00:00",
-    "dataEndAt": "2022-11-03T10:30:00+00:00",
-    "windowSize": 5,
-    "optimalDataPoints": [
-      {
-        "location": "PJM_ROANOKE",
-        "timestamp": "2022-11-03T10:15:00+00:00",
-        "duration": 5,
-        "value": 544.8099506434546
-      }
-    ],
-    "forecastData": [
-      {
-        "location": "PJM_ROANOKE",
-        "timestamp": "2022-11-02T10:30:00+00:00",
-        "duration": 5,
-        "value": 547.3183851085558
-      },
-      {
-        "location": "PJM_ROANOKE",
-        "timestamp": "2022-11-02T10:35:00+00:00",
-        "duration": 5,
-        "value": 547.66173548531
-      }]
-    }]`)
-
-  return PLACEHOLDER
-}
+async function _getForecastedEmissionLevels(apiUrl, region) {
+  const response = await axios.get(`${apiUrl}/emissions/forecasts/current?location=${region}`)
+  return response.data
+  }
 
 async function _getForecastWithinDelayTolerance(forecastData, delayTolerance) {
   // Find all entries within delay tolerance in minutes
