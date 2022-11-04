@@ -12,6 +12,11 @@ inputs:
     description: The URL of the host where the Carbon Aware WebAPI is hosted (see documentation)
     required: true
     default: 'https://carbon-aware-api.azurewebsites.net'
+  environment-name:
+    description: Name of repo environment that will be used to delay the job
+    required: false
+    default: 'green-delay'
+    
 runs:
   using: 'node16'
   main: 'dist/index.js'

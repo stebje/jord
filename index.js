@@ -11,13 +11,11 @@ async function run() {
 	const token = core.getInput('token')
 	const delayTolerance = parseInt(core.getInput('delay-tolerance'))
 	const baseUrlCarbonApi = core.getInput('base-url-carbon-aware-api')
+  const ENV_NAME = core.getInput('environment-name')
 
 	// Instantiate octokit client
 	const octokit = github.getOctokit(token)
-
-  // Set some global constants
-  const ENV_NAME = 'green-delay'
-
+  
 	// Determine OS of runner
 	const RUNNER_PLATFORM = os.platform()
 	const RUNNER_OS = await _getRunnerOs(RUNNER_PLATFORM)
