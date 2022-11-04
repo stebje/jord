@@ -120,6 +120,9 @@ async function run() {
       // Add a job summary for human-friendly output
       /**core.summary.addHeading('Thank you for going green! 🌱').addText(`This job has been delayed for ${JOB_DELAY} minutes in accordance with the set delay tolerance of ${delayTolerance} and the available carbon emission forecast. According to the forecast, this will represent a ${percentageDiff} % reduction in carbon emissions :tada:`).addLink('Learn more about the Carbon Aware SDK and the Green Software Foundation', 'https://github.com/Green-Software-Foundation/carbon-aware-sdk').write()*/
 
+      // Write to job summary env variable
+      core.exportVariable('GITHUB_STEP_SUMMARY', `🌱 This job has been delayed for ${JOB_DELAY} minutes in accordance with the set delay tolerance of ${delayTolerance} and the available carbon emission forecast. According to the forecast, this will represent a ${percentageDiff} % reduction in carbon emissions :tada:`)
+
 			await _delayJob(JOB_DELAY, octokit, github, ENV_NAME)
 		}
 
