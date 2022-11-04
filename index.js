@@ -95,11 +95,6 @@ async function run() {
 		}
 
 		// TODO
-		// Currently the loop is infinite: the action cancels the run, another workflow retriggers it (with a wait timer set on the environment), and if a better forecasted time is found during the second workflow run, then the loop repeats.
-		// Target: we want the time delay to be a one off
-		// Solution idea: in the action, check if the job has already been delayed once (use the context.payload.workflow_run.run_attempt attribute??). If false, run the action as usual.
-
-		// TODO
 		// We can't use the same environment with a fixed name, as several workflows might be targeting that environment at the same time and will lead to unexpected results
 		// Solution idea: suffix the environment name with some identified, e.g. the workflow run ID. Alernatively, we delete the environment as part of the action. This is not ideal, as multiple jobs might be running simeoultaneously...
 
