@@ -15,7 +15,7 @@ async function run() {
 
 	// Instantiate octokit client
 	const octokit = github.getOctokit(token)
-  
+
 	// Determine OS of runner
 	const RUNNER_PLATFORM = os.platform()
 	const RUNNER_OS = await _getRunnerOs(RUNNER_PLATFORM)
@@ -38,14 +38,16 @@ async function run() {
 
 	core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING.rating}`)
 
-	// We only want to run the job if it hasn't already been delayed once (the current implementation is a "one-off" delay, to avoid infinite loops)
-	// We decide whether the current job has already been delayed by looking at the amount of run attempts for this workflow run ID
+  // Get context of the current workflow run
 	const workflowRun = await octokit.rest.actions.getWorkflowRun({
 		owner: github.context.repo.owner,
 		repo: github.context.repo.repo,
 		run_id: github.context.runId,
 	})
 
+  // We only want to run the job if it hasn't already been delayed once (the current implementation is a "one-off" delay, to avoid infinite loops)
+	// We decide whether the current job has already been delayed by looking at the amount of run attempts for this workflow's run ID. 
+  // TODO - this logic should be improved, we cannot be sure that the previous run attempt was triggered by this action, it could also be user-triggered
 	if (workflowRun.data.run_attempt > 1) {
 		core.info('This job has already been delayed once, the workflow will continue without taking further action.')
 
@@ -145,7 +147,7 @@ async function _getRunnerLocation(location) {
 	}
 
 	// TODO - how to deal with multiple regions in the same state?
-	//   E.g. there are two azure datacenters in Virginia, but it's hard to get granular enough data to distinguish the two
+	//   E.g. there are two azure datacenters in Virginia, but it's hard to get granular enough data to distinguish the two wrt emission rating
 	return matchingRegions[0]
 }
 
@@ -178,6 +180,7 @@ async function _getLowestForecastedEmission(forecastData) {
 	return lowestForecast
 }
 
+// Calculate how long a job should be delayed based on current vs forecasted emission ratings
 async function _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING) {
 	if (LOWEST_FORECASTED_EMISSION_RATING.value < CURRENT_EMISSION_RATING.rating) {
 		let jobDelay = _getTimeDiffMinutes(CURRENT_EMISSION_RATING.time, LOWEST_FORECASTED_EMISSION_RATING.timestamp)
