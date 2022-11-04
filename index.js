@@ -206,11 +206,11 @@ async function _delayJob(minutes, octokit, github) {
 
 	// Create environment with a set wait timer
 	// This is how we can use native GitHub Actions functionality to delay the job
-	// TODO - find a better naming convention for the environment to avoid several jobs targeting and editing the same environment
+  const envName = `green-delay-${github.context.runId}`
 	await octokit.rest.repos.createOrUpdateEnvironment({
 		owner: github.context.repo.owner,
 		repo: github.context.repo.repo,
-		environment_name: 'green-env',
+		environment_name: envName,
 		wait_timer: minutes,
 	})
 }
