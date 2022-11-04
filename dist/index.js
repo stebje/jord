@@ -1388,10 +1388,6 @@ async function run() {
 		}
 
 		// TODO
-		// We can't use the same environment with a fixed name, as several workflows might be targeting that environment at the same time and will lead to unexpected results
-		// Solution idea: suffix the environment name with some identified, e.g. the workflow run ID. Alernatively, we delete the environment as part of the action. This is not ideal, as multiple jobs might be running simeoultaneously...
-
-		// TODO
 		// Add job summary (markdown formatted)
 		// Include:
 		// - Delay tolerance
