@@ -1380,8 +1380,10 @@ async function run() {
 		core.debug(LOWEST_FORECASTED_EMISSION_RATING)
 
     // Get percentage difference between current and lowest forecasted emission rating
+    let percentageDiff = 0
     if (LOWEST_FORECASTED_EMISSION_RATING.value < CURRENT_EMISSION_RATING.rating) {
-      const percentageDiff = CURRENT_EMISSION_RATING.rating / LOWEST_FORECASTED_EMISSION_RATING.value * 100
+      percentageDiff = (CURRENT_EMISSION_RATING.rating - LOWEST_FORECASTED_EMISSION_RATING.value) / CURRENT_EMISSION_RATING.rating * 100
+
       core.info(`Percentage difference between current and lowest forecasted emission rating: ${percentageDiff}`)
     }
 
@@ -1411,7 +1413,7 @@ async function run() {
       // Add a job summary for human-friendly output
       await core.summary
         .addHeading('Thank you for going green! 🌱')
-        .addText(`This job has been delayed for ${JOB_DELAY} minutes in accordance with the set delay tolerance of ${delayTolerance} and the available carbon emission forecast.\n\nAccording to the forecast, this will represent a ${percentageDiff}% reduction in carbon emissions :tada:`)
+        .addText(`This job has been delayed for ${JOB_DELAY} minutes in accordance with the set delay tolerance of ${delayTolerance} and the available carbon emission forecast. According to the forecast, this will represent a ${percentageDiff} % reduction in carbon emissions :tada:`)
         .addLink('Learn more about the Carbon Aware SDK and the Green Software Foundation', 'https://github.com/Green-Software-Foundation/carbon-aware-sdk')
         .write()
 
