@@ -86,6 +86,12 @@ async function run() {
 		)
 		core.debug(LOWEST_FORECASTED_EMISSION_RATING)
 
+    // Get percentage difference between current and lowest forecasted emission rating
+    if (LOWEST_FORECASTED_EMISSION_RATING.value < CURRENT_EMISSION_RATING.rating) {
+      const percentageDiff = CURRENT_EMISSION_RATING.rating / LOWEST_FORECASTED_EMISSION_RATING.value * 100
+      core.info(`Percentage difference between current and lowest forecasted emission rating: ${percentageDiff}`)
+    }
+
 		// Calculate how long the job should be delayed (in minutes)
 		const JOB_DELAY = await _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING)
 
@@ -108,6 +114,13 @@ async function run() {
 			core.warning(
 				`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). If the job is re-run, it will be delayed for ${JOB_DELAY} minutes.`
 			)
+
+      // Add a job summary for human-friendly output
+      await core.summary
+        .addHeading('Thank you for going green! 🌱')
+        .addText(`This job has been delayed for ${JOB_DELAY} minutes in accordance with the set delay tolerance of ${delayTolerance} and the available carbon emission forecast.\n\nAccording to the forecast, this will represent a ${percentageDiff}% reduction in carbon emissions :tada:`)
+        .addLink('Learn more about the Carbon Aware SDK and the Green Software Foundation', 'https://github.com/Green-Software-Foundation/carbon-aware-sdk')
+        .write()
 
 			await _delayJob(JOB_DELAY, octokit, github, ENV_NAME)
 		}
