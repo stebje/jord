@@ -4,67 +4,133 @@ const github = require('@actions/github')
 const ipInfo = require('ipinfo')
 const azureRegions = require('./data/azure-regions.json')
 const os = require('node:os')
+const axios = require('axios').default
 
 async function run() {
-  // Get action input parameters
-  const delayTolerance = parseInt(core.getInput('delay-tolerance'))
-  
+	// Get action input parameters
+	const token = core.getInput('token')
+	const delayTolerance = parseInt(core.getInput('delay-tolerance'))
+	const baseUrlCarbonApi = core.getInput('base-url-carbon-aware-api')
+  const ENV_NAME = core.getInput('environment-name')
+
+	// Instantiate octokit client
+	const octokit = github.getOctokit(token)
+
 	// Determine OS of runner
 	const RUNNER_PLATFORM = os.platform()
 	const RUNNER_OS = await _getRunnerOs(RUNNER_PLATFORM)
+
 	core.info(`Runner OS: ${RUNNER_OS}`)
 
 	// Get IP info of the runner machine
 	const IP_INFO = await _getIPInfo()
+
 	core.info(`Runner IP: ${IP_INFO.ip}`)
 	core.info(`Runner IP location: ${IP_INFO.region}`)
 
 	// Get Azure region corresponding to runner location
 	const RUNNER_LOCATION = await _getRunnerLocation(IP_INFO.region)
+
 	core.info(`Matching Azure region: ${RUNNER_LOCATION}`)
 
 	// Get current emission level at runner location
-	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(RUNNER_LOCATION)
+	const CURRENT_EMISSION_RATING = await _getCurrentEmissionLevel(baseUrlCarbonApi, RUNNER_LOCATION)
+
 	core.info(`Current emission rating in region ${RUNNER_LOCATION}: ${CURRENT_EMISSION_RATING.rating}`)
 
-	// Get forecasted emission level at runner location
-  // We don't want to print everything to console by default, to reduce noise. Rather print it to debug log.
-	const FORECASTED_EMISSION_RATINGS = await _getForecastedEmissionLevels(RUNNER_LOCATION)
-	core.info(`Successfully fetched forecasted emission ratings in region ${RUNNER_LOCATION}`)
-  core.debug(`Forecasted emission ratings in region ${RUNNER_LOCATION}: ${JSON.stringify(FORECASTED_EMISSION_RATINGS)}`)
+  // Get context of the current workflow run
+	const workflowRun = await octokit.rest.actions.getWorkflowRun({
+		owner: github.context.repo.owner,
+		repo: github.context.repo.repo,
+		run_id: github.context.runId,
+	})
 
-  // Get all forecasted emission ratings within the tolerance window (in minutes)
-  core.info(`Delay tolerance: ${delayTolerance} minutes`)
-  
-  const FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE = await _getForecastWithinDelayTolerance(FORECASTED_EMISSION_RATINGS[0].forecastData, delayTolerance)
-  
-  core.info(`Found ${FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE.length} forecasted emission ratings within the delay tolerance`)
-  core.debug(FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE)
+  // We only want to run the job if it hasn't already been delayed once (the current implementation is a "one-off" delay, to avoid infinite loops)
+	// We decide whether the current job has already been delayed by looking at the amount of run attempts for this workflow's run ID. 
+  // TODO - this logic should be improved, we cannot be sure that the previous run attempt was triggered by this action, it could also be user-triggered
+	if (workflowRun.data.run_attempt > 1) {
+		core.info('This job has already been delayed once, the workflow will continue without taking further action.')
 
-  // Find the lowest emission rating available within the tolerance window
-  const LOWEST_FORECASTED_EMISSION_RATING = await _getLowestForecastedEmission(FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE)
-  
-  core.info(`Lowest emission rating found within delay tolerance: ${LOWEST_FORECASTED_EMISSION_RATING.value} at ${LOWEST_FORECASTED_EMISSION_RATING.timestamp}`)
-  core.debug(LOWEST_FORECASTED_EMISSION_RATING)
+    // Delete the environment created in previous run
+    /**core.info(`Deleting environment ${ENV_NAME} in preparation for next run`)
+    await octokit.rest.repos.deleteAnEnvironment({
+      owner: github.context.repo.owner,
+      repo: github.context.repo.repo,
+      environment_name: ENV_NAME
+    })*/
+		return
+	} else {
+		// Get forecasted emission level at runner location
+		// We don't want to print everything to console by default, to reduce noise. Rather print it to debug log.
+		const FORECASTED_EMISSION_RATINGS = await _getForecastedEmissionLevels(baseUrlCarbonApi, RUNNER_LOCATION)
 
-  // Calculate how long the job should be delayed (in minutes)
-  const JOB_DELAY = await _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING)
-  
-  core.info(`Calculated job delay: ${JOB_DELAY} minutes`)
+		core.info(`Successfully fetched forecasted emission ratings in region ${RUNNER_LOCATION}`)
+		core.debug(`Forecasted emission ratings in region ${RUNNER_LOCATION}: ${JSON.stringify(FORECASTED_EMISSION_RATINGS)}`)
 
-  // Determine whether to run the job or not
-    // Things to tak into account:
-    // - current emission level
-    // - forecasted emission level
-    // - job type (e.g. cron, pull request, etc.)
-    // - job priority (e.g. high, medium, low)
-    // - job size (e.g. small, medium, large)
-    // - how much tolerance the user has in terms of delaying the job
-    // - depenencies on other jobs
-    // - ...
+		// Get all forecasted emission ratings within the tolerance window (in minutes)
+		core.info(`Delay tolerance: ${delayTolerance} minutes`)
 
-	// If job is run, create job summary
-	// ...
+		const FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE = await _getForecastWithinDelayTolerance(
+			FORECASTED_EMISSION_RATINGS[0].forecastData,
+			delayTolerance
+		)
+
+		core.info(`Found ${FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE.length} forecasted emission ratings within the delay tolerance`)
+		core.debug(FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE)
+
+		// Find the lowest emission rating available within the tolerance window
+		const LOWEST_FORECASTED_EMISSION_RATING = await _getLowestForecastedEmission(FORECASTED_EMISSION_RATINGS_WITHIN_TOLERANCE)
+
+		core.info(
+			`Lowest emission rating found within delay tolerance: ${LOWEST_FORECASTED_EMISSION_RATING.value} at ${LOWEST_FORECASTED_EMISSION_RATING.timestamp}`
+		)
+		core.debug(LOWEST_FORECASTED_EMISSION_RATING)
+
+    // Get percentage difference between current and lowest forecasted emission rating
+    let percentageDiff = 0
+    if (LOWEST_FORECASTED_EMISSION_RATING.value < CURRENT_EMISSION_RATING.rating) {
+      percentageDiff = ((CURRENT_EMISSION_RATING.rating - LOWEST_FORECASTED_EMISSION_RATING.value) / LOWEST_FORECASTED_EMISSION_RATING.value * 100).toFixed(2)
+
+      core.info(`Percentage difference between current and lowest forecasted emission rating: ${percentageDiff}`)
+    }
+
+		// Calculate how long the job should be delayed (in minutes)
+		const JOB_DELAY = await _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING)
+
+		core.info(`Calculated job delay: ${JOB_DELAY} minutes`)
+
+		// If the current emission rating is lower than any of the forecasted ones, then there's no need to delay
+		// Otherwise, delay the job using a repo environment for the calculated amount of time
+		if (JOB_DELAY == 0) {
+			core.info(
+				`🌱 Current emission rating (${CURRENT_EMISSION_RATING.rating}) is lower than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). No delay required.`
+			)
+      // Delete the environment created in previous run
+      core.info(`Deleting environment ${ENV_NAME}in preparation for next run`)
+      await octokit.rest.repos.deleteAnEnvironment({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        environment_name: ENV_NAME
+      })
+		} else {
+			core.warning(
+				`🌱 Current emission rating (${CURRENT_EMISSION_RATING.rating}) is ${percentageDiff}% higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). If the job is re-run, it will be delayed for ${JOB_DELAY} minutes.`
+			)
+
+      // Add a job summary for human-friendly output
+      /**core.summary.addHeading('Thank you for going green! 🌱').addText(`This job has been delayed for ${JOB_DELAY} minutes in accordance with the set delay tolerance of ${delayTolerance} and the available carbon emission forecast. According to the forecast, this will represent a ${percentageDiff} % reduction in carbon emissions :tada:`).addLink('Learn more about the Carbon Aware SDK and the Green Software Foundation', 'https://github.com/Green-Software-Foundation/carbon-aware-sdk').write()*/
+
+			await _delayJob(JOB_DELAY, octokit, github, ENV_NAME)
+		}
+
+		// TODO
+		// Add job summary (markdown formatted)
+		// Include:
+		// - Delay tolerance
+		// - The current emission rating found + timestamp
+		// - The lowest forecasted emission rating found + timestamp
+		// - Can we link the workflow job runs, to e.g. include something like "This jobs was delayed by X minutes, leading to a reduction of XX% emission rating"?
+	}
 }
 
 run()
@@ -99,95 +165,79 @@ async function _getRunnerLocation(location) {
 	}
 
 	// TODO - how to deal with multiple regions in the same state?
-	//   E.g. there are two azure datacenters in Virginia, but it's hard to get granular enough data to distinguish the two
+	//   E.g. there are two azure datacenters in Virginia, but it's hard to get granular enough data to distinguish the two wrt emission rating
 	return matchingRegions[0]
 }
 
-async function _getCurrentEmissionLevel(region) {
-	// TODO - Add API call to Carbon Aware SDK
-  
-  const PLACEHOLDER = JSON.parse(
-		'[{"location": "PJM_ROANOKE","time": "2022-11-02T10:20:00+00:00","rating": 545.67162111,"duration": "00:05:00"}]'
-	)
-
-  return PLACEHOLDER[0]
+async function _getCurrentEmissionLevel(apiUrl, region) {
+	const response = await axios.get(`${apiUrl}/emissions/bylocations/best?location=${region}`)
+	return response.data[0]
 }
 
-async function _getForecastedEmissionLevels(region) {
-	// TODO - Add API call to Carbon Aware SDK
-  
-  const PLACEHOLDER = JSON.parse(`[{
-    "generatedAt": "2022-11-02T10:25:00+00:00",
-    "requestedAt": "2022-11-02T10:28:46.8644078+00:00",
-    "location": "eastus",
-    "dataStartAt": "2022-11-02T10:30:00+00:00",
-    "dataEndAt": "2022-11-03T10:30:00+00:00",
-    "windowSize": 5,
-    "optimalDataPoints": [
-      {
-        "location": "PJM_ROANOKE",
-        "timestamp": "2022-11-03T10:15:00+00:00",
-        "duration": 5,
-        "value": 544.8099506434546
-      }
-    ],
-    "forecastData": [
-      {
-        "location": "PJM_ROANOKE",
-        "timestamp": "2022-11-02T10:30:00+00:00",
-        "duration": 5,
-        "value": 547.3183851085558
-      },
-      {
-        "location": "PJM_ROANOKE",
-        "timestamp": "2022-11-02T10:35:00+00:00",
-        "duration": 5,
-        "value": 547.66173548531
-      }]
-    }]`)
-
-  return PLACEHOLDER
+async function _getForecastedEmissionLevels(apiUrl, region) {
+	const response = await axios.get(`${apiUrl}/emissions/forecasts/current?location=${region}`)
+	return response.data
 }
 
 async function _getForecastWithinDelayTolerance(forecastData, delayTolerance) {
-  // Find all entries within delay tolerance in minutes
-  let maxTimeStamp = new Date(new Date().getTime() + delayTolerance * 60000)
-  let currentTime = new Date()
+	let maxTimeStamp = new Date(new Date().getTime() + delayTolerance * 60000)
+	let currentTime = new Date()
 
-  let forecastWithinTolerance = forecastData.filter((entry) => {
-    let forecastTimeStamp = new Date(entry.timestamp)
-    // We only want the forecasts that are in the future and within the delay tolerance
-    return forecastTimeStamp <= maxTimeStamp && forecastTimeStamp >= currentTime
-  }
-  )
-  return forecastWithinTolerance
+	let forecastWithinTolerance = forecastData.filter((entry) => {
+		let forecastTimeStamp = new Date(entry.timestamp)
+		// We only want the forecasts that are in the future and within the delay tolerance
+		return forecastTimeStamp <= maxTimeStamp && forecastTimeStamp >= currentTime
+	})
+	return forecastWithinTolerance
 }
 
 async function _getLowestForecastedEmission(forecastData) {
-  let lowestForecast = forecastData.reduce((prev, current) => {
-    return (prev.value < current.value) ? prev : current
-  }
-  )
-  return lowestForecast
+	let lowestForecast = forecastData.reduce((prev, current) => {
+		return prev.value < current.value ? prev : current
+	})
+	return lowestForecast
 }
 
+// Calculate how long a job should be delayed based on current vs forecasted emission ratings
 async function _calculateJobDelay(CURRENT_EMISSION_RATING, LOWEST_FORECASTED_EMISSION_RATING) {
-  if (LOWEST_FORECASTED_EMISSION_RATING.value < CURRENT_EMISSION_RATING.rating) {
-    let jobDelay = _getTimeDiffMinutes(CURRENT_EMISSION_RATING.time, LOWEST_FORECASTED_EMISSION_RATING.timestamp)
-    
-    return jobDelay
-  } else {
-    let jobDelay = 0
+	if (LOWEST_FORECASTED_EMISSION_RATING.value < CURRENT_EMISSION_RATING.rating) {
+		let jobDelay = _getTimeDiffMinutes(CURRENT_EMISSION_RATING.time, LOWEST_FORECASTED_EMISSION_RATING.timestamp)
 
-    return jobDelay
-  }
+		return jobDelay
+	} else {
+		let jobDelay = 0
+
+		return jobDelay
+	}
 }
 
 async function _getTimeDiffMinutes(time1, time2) {
-  let dt1 = new Date(time1)
-  let dt2 = new Date(time2)
-  let timeDiffRaw = (dt2.getTime() - dt1.getTime()) / 1000 / 60
-  let timeDiff = Math.round(timeDiffRaw)
+	let dt1 = new Date(time1)
+	let dt2 = new Date(time2)
+	let timeDiffRaw = (dt2.getTime() - dt1.getTime()) / 1000 / 60
+	let timeDiff = Math.round(timeDiffRaw)
 
-  return timeDiff
+	return timeDiff
+}
+
+async function _delayJob(minutes, octokit, github, envName) {
+	// First we need to cancel the current workflow
+	// There's no support currently for cancelling individual jobs, so we need to cancel the entire workflow
+
+	await octokit.rest.actions.cancelWorkflowRun({
+		owner: github.context.repo.owner,
+		repo: github.context.repo.repo,
+		run_id: github.context.runId,
+	})
+
+	// Create environment with a set wait timer
+	// This is how we can use native GitHub Actions functionality to delay the job
+	await octokit.rest.repos.createOrUpdateEnvironment({
+		owner: github.context.repo.owner,
+		repo: github.context.repo.repo,
+		environment_name: envName,
+		wait_timer: minutes,
+	})
+
+  core.setFailed(`🌱 This job should be delayed by ${minutes} minutes to reduce the carbon footprint, thank you for going green!`)
 }

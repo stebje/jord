@@ -1,10 +1,22 @@
 name: Jord
 description: A GitHub Action that helps move workloads into greener time periods
 inputs:
+  token:
+    description: A token with appropriate permissions (see documentation)
+    required: true
   delay-tolerance:
     description: Maximum number of minutes the job can be delayed
     required: false
     default: '5'
+  base-url-carbon-aware-api:
+    description: The URL of the host where the Carbon Aware WebAPI is hosted (see documentation)
+    required: true
+    default: 'https://carbon-aware-api.azurewebsites.net'
+  environment-name:
+    description: Name of repo environment that will be used to delay the job
+    required: false
+    default: 'green-delay'
+    
 runs:
   using: 'node16'
   main: 'dist/index.js'
