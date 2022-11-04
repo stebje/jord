@@ -69,8 +69,6 @@ jobs:
         with:
           github-token: ${{ secrets.GREENTOKEN }}
           script: |
-            console.log(context)
-
             github.rest.actions.reRunWorkflow({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -87,7 +85,24 @@ jobs:
 | `base-url-carbon-aware-api`    | The base URL of the host where the [Carbon aware WebAPI](https://github.com/Green-Software-Foundation/carbon-aware-sdk) is deployed   | `https://carbon-aware-api.azurewebsites.net`  | `false`  |
 | `environment-name` | Desired name of the [repository environment](https://docs.github.com/en/actions/deployment/targeting-different-environments/using-environments-for-deployment) that will be created and used to delay the job  | `green-delay` | `false`  |
 
+## Known limitations
+
+(please see below for future improvements addressing the limitations listed here)
+
+- There is no way currently to ensure that the delayed job will run in the same datacenter as the one originally assigned to. This is due to how GitHub Actions allocates hosted runners.
+- Only GitHub-hosted runners are supported at the moment, not self-hosted runners
+- Only Linux and Windows runners are supported at the moment, not macOS
+
+## Future improvements
+
+(insert)
+
 ## Contributing
 
 :point_right: [How to contribute](./CONTRIBUTING.md)
+
 :point_right: [Code of Conduct](./CODE_OF_CONDUCT.md)
+
+## License
+
+:point_right: [MIT](./LICENSE)
