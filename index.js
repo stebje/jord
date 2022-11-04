@@ -97,6 +97,13 @@ async function run() {
 			core.info(
 				`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is lower than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). No delay required.`
 			)
+      // Delete the environment created in previous run
+      core.info(`Deleting environment ${ENV_NAME}in preparation for next run`)
+      await octokit.rest.repos.deleteAnEnvironment({
+        owner: github.context.repo.owner,
+        repo: github.context.repo.repo,
+        environment_name: ENV_NAME
+      })
 		} else {
 			core.notice(
 				`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). Delaying job for ${JOB_DELAY} minutes.`
