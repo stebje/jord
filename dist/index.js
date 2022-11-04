@@ -1308,6 +1308,9 @@ async function run() {
 	// Instantiate octokit client
 	const octokit = github.getOctokit(token)
 
+  // Set some global constants
+  const ENV_NAME = 'green-delay'
+
 	// Determine OS of runner
 	const RUNNER_PLATFORM = os.platform()
 	const RUNNER_OS = await _getRunnerOs(RUNNER_PLATFORM)
@@ -1340,6 +1343,9 @@ async function run() {
 
 	if (workflowRun.data.run_attempt > 1) {
 		core.info('This job has already been delayed once, the workflow will continue without taking further action.')
+
+    // Delete the environment created in previous run
+    // TODO
 		return
 	} else {
 		// Get forecasted emission level at runner location
@@ -1384,7 +1390,7 @@ async function run() {
 				`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). Delaying job for ${JOB_DELAY} minutes.`
 			)
 
-			await _delayJob(JOB_DELAY, octokit, github)
+			await _delayJob(JOB_DELAY, octokit, github, ENV_NAME)
 		}
 
 		// TODO
@@ -1483,7 +1489,7 @@ async function _getTimeDiffMinutes(time1, time2) {
 	return timeDiff
 }
 
-async function _delayJob(minutes, octokit, github) {
+async function _delayJob(minutes, octokit, github, envName) {
 	// First we need to cancel the current workflow
 	// There's no support currently for cancelling individual jobs, so we need to cancel the entire workflow
 
@@ -1495,7 +1501,6 @@ async function _delayJob(minutes, octokit, github) {
 
 	// Create environment with a set wait timer
 	// This is how we can use native GitHub Actions functionality to delay the job
-  const envName = `green-delay`
 	await octokit.rest.repos.createOrUpdateEnvironment({
 		owner: github.context.repo.owner,
 		repo: github.context.repo.repo,
