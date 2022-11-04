@@ -39,13 +39,13 @@ async function run() {
 
 	// We only want to run the job if it hasn't already been delayed once (the current implementation is a "one-off" delay, to avoid infinite loops)
 	// We decide whether the current job has already been delayed by looking at the amount of run attempts for this workflow run ID
-	const worflowRunData = await octokit.rest.actions.getWorkflowRun({
+	const workflowRun = await octokit.rest.actions.getWorkflowRun({
 		owner: github.context.repo.owner,
 		repo: github.context.repo.repo,
 		run_id: github.context.runId,
-	}).data
+	})
 
-	if (worflowRunData.run_attempts > 1) {
+	if (workflowRun.data.run_attempt > 1) {
 		core.info('This job has already been delayed once, the workflow will continue without taking further action.')
 		return
 	} else {
