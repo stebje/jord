@@ -105,8 +105,8 @@ async function run() {
         environment_name: ENV_NAME
       })
 		} else {
-			core.notice(
-				`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). Delaying job for ${JOB_DELAY} minutes.`
+			core.warning(
+				`Current emission rating (${CURRENT_EMISSION_RATING.rating}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). If the job is re-run, it will be delayed for ${JOB_DELAY} minutes.`
 			)
 
 			await _delayJob(JOB_DELAY, octokit, github, ENV_NAME)
@@ -227,4 +227,6 @@ async function _delayJob(minutes, octokit, github, envName) {
 		environment_name: envName,
 		wait_timer: minutes,
 	})
+
+  core.setFailed(`Exiting, the job should be delayed for ${minutes} minutes`)
 }
