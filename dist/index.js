@@ -1345,12 +1345,12 @@ async function run() {
 		core.info('This job has already been delayed once, the workflow will continue without taking further action.')
 
     // Delete the environment created in previous run
-    core.info(`Deleting environment ${ENV_NAME}in preparation for next run`)
+    /**core.info(`Deleting environment ${ENV_NAME} in preparation for next run`)
     await octokit.rest.repos.deleteAnEnvironment({
       owner: github.context.repo.owner,
       repo: github.context.repo.repo,
       environment_name: ENV_NAME
-    })
+    })*/
 		return
 	} else {
 		// Get forecasted emission level at runner location
