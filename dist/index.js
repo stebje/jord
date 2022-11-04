@@ -1414,8 +1414,6 @@ async function run() {
       /**core.summary.addHeading('Thank you for going green! 🌱').addText(`This job has been delayed for ${JOB_DELAY} minutes in accordance with the set delay tolerance of ${delayTolerance} and the available carbon emission forecast. According to the forecast, this will represent a ${percentageDiff} % reduction in carbon emissions :tada:`).addLink('Learn more about the Carbon Aware SDK and the Green Software Foundation', 'https://github.com/Green-Software-Foundation/carbon-aware-sdk').write()*/
 
 			await _delayJob(JOB_DELAY, octokit, github, ENV_NAME)
-
-      core.setFailed(`Exiting, the job should be delayed for ${minutes} minutes`)
 		}
 
 		// TODO
@@ -1533,6 +1531,8 @@ async function _delayJob(minutes, octokit, github, envName) {
 		environment_name: envName,
 		wait_timer: minutes,
 	})
+
+  core.setFailed(`Exiting, the job should be delayed for ${minutes} minutes`)
 }
 
 
