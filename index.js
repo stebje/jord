@@ -89,7 +89,7 @@ async function run() {
     // Get percentage difference between current and lowest forecasted emission rating
     let percentageDiff = 0
     if (LOWEST_FORECASTED_EMISSION_RATING.value < CURRENT_EMISSION_RATING.rating) {
-      percentageDiff = (CURRENT_EMISSION_RATING.rating - LOWEST_FORECASTED_EMISSION_RATING.value) / CURRENT_EMISSION_RATING.rating * 100
+      percentageDiff = (CURRENT_EMISSION_RATING.rating - LOWEST_FORECASTED_EMISSION_RATING.value) / LOWEST_FORECASTED_EMISSION_RATING.value * 100
 
       core.info(`Percentage difference between current and lowest forecasted emission rating: ${percentageDiff}`)
     }
@@ -114,7 +114,7 @@ async function run() {
       })
 		} else {
 			core.warning(
-				`🌱 Current emission rating (${CURRENT_EMISSION_RATING.rating}) is higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). If the job is re-run, it will be delayed for ${JOB_DELAY} minutes.`
+				`🌱 Current emission rating (${CURRENT_EMISSION_RATING.rating}) is ${percentageDiff} higher than the lowest forecasted emission rating (${LOWEST_FORECASTED_EMISSION_RATING.value}). If the job is re-run, it will be delayed for ${JOB_DELAY} minutes.`
 			)
 
       // Add a job summary for human-friendly output
