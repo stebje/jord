@@ -2,6 +2,8 @@
 
 > 🌱 A GitHub Action that helps move workloads into greener time periods
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-pink.svg)](https://opensource.org/licenses/MIT)
+
 ## Description
 
 This action uses the [Carbon Aware SDK/API](https://github.com/Green-Software-Foundation/carbon-aware-sdk) to calculate if a job should be delayed in order to reduce the carbon footprint. 
